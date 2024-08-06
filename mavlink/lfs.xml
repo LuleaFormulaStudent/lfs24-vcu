@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<mavlink>
+
+    <include>common.xml</include>
+    <!-- <version>9</version> -->
+    <dialect>8</dialect>
+
+    <enums>
+        <enum name="DRIVING_MODE">
+            <description>A enum that is not being used</description>
+            <entry value="0" name="NEUTRAL">
+                <description>In neutral driving mode</description>
+            </entry>
+            <entry value="1" name="FORWARD">
+                <description>In forward driving mode</description>
+            </entry>
+            <entry value="2" name="REVERSE">
+                <description>In reverse driving mode</description>
+            </entry>
+        </enum>
+    </enums>
+
+    <messages>
+        <!-- Messages are defined here (optional) -->
+        <message id="50000" name="THROTTLE_DATA">
+            <description>Handles throttle data, both raw and parsed.</description>
+            <field type="uint8_t" name="raw" units="">Raw input value from adc</field>
+            <field type="float" name="input" units="percent">Parsed input value</field>
+            <field type="float" name="output" units="percent">Calculated output value</field>
+        </message>
+        <message id="50001" name="BRAKE_DATA">
+            <description>Handles brake data, both raw and parsed.</description>
+            <field type="uint8_t" name="raw" units="">Raw input value from adc</field>
+            <field type="float" name="input" units="percent">Parsed input value</field>
+            <field type="float" name="output" units="percent">Calculated output value</field>
+        </message>
+        <message id="50002" name="DRIVING_MODE_MESSAGE">
+            <description>Describes the current driving mode</description>
+            <field type="uint8_t" name="driving_mode" enum="DRIVING_MODE">Current driving mode</field>
+        </message>
+        <message id="50003" name="VEHICLE_DATA">
+            <description>Describes the current driving mode</description>
+            <field type="float" name="power" units="kW">The power the vehicle is using</field>
+            <field type="float" name="speed" units="km/h">The total current speed of the vehicle</field>
+            <field type="float" name="heading" units="degrees">The current heading the vehicle</field>
+            <field type="float" name="steering" units="degrees">The current steering angle</field>
+        </message>
+    </messages>
+</mavlink>

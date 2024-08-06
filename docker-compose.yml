@@ -1,0 +1,37 @@
+services:
+    influxdb:
+        container_name: influxdb-database
+        image: influxdb
+        restart: always
+        networks:
+            - lfs-network
+        env_file: ./.env
+        ports:
+            - "8086:8086"
+        volumes:
+            - ./data/influxdb-data:/var/lib/influxdb2
+            - ./data/influxdb-config:/etc/influxdb2
+
+    lfs_vcu:
+        container_name: lfs-vcu
+        build: .
+        command: "npm run prod"
+        env_file: ./.env
+        privileged: true
+        depends_on:
+            - influxdb
+        networks:
+            - lfs-network
+        ports:
+            - "5432:5432"
+            - "6000:6000"
+        volumes:
+            - ./data:/lfs-vcu/data
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
+
+networks:
+    lfs-network:
+        driver: bridge
+
+

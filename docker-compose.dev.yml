@@ -1,0 +1,17 @@
+services:
+    influxdb:
+        container_name: influxdb-database
+        image: influxdb
+        restart: always
+        env_file: 
+            - .env
+        ports:
+            - "8086:8086"
+        volumes:
+            - ./data/influxdb-data:/var/lib/influxdb2
+            - ./data/influxdb-config:/etc/influxdb2
+        healthcheck:
+            test: [ "CMD", "influx", "ping" ]
+            timeout: 5s
+            interval: 1m
+            retries: 3

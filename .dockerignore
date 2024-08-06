@@ -1,0 +1,9 @@
+node_modules
+logs
+old
+other
+tests
+data/*
+*.db
+package-lock.json
+README.md

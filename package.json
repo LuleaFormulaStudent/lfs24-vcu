@@ -1,0 +1,34 @@
+{
+    "name": "lfs24-vcu",
+    "version": "1.0.0",
+    "description": "Control software and system for LFS24 Project car",
+    "main": "main.ts",
+    "type": "module",
+    "scripts": {
+        "dev": "node --loader ts-node/esm --experimental-specifier-resolution=node main.ts",
+        "prod": "node dist/main.js",
+        "gen-mavlink": "node --loader ts-node/esm mavlink/gen_mavlink_mappings.ts",
+        "build": "tsc -project tsconfig.json"
+    },
+    "author": "Erik Landmark",
+    "license": "ISC",
+    "dependencies": {
+        "@signalk/nmea0183-signalk": "^3.15.1",
+        "gps": "^0.6.1",
+        "i2c-bus": "^5.2.3",
+        "mavlink-mappings": "^1.0.20-20240131-0",
+        "node-mavlink": "^2.0.7",
+        "node-mavlink-ftp": "^0.0.1",
+        "node-mavlink-heartbeat": "^0.0.1-alpha.1",
+        "onoff": "^6.0.3",
+        "serialport": "^12.0.0",
+        "typescript": "^5.2.2",
+        "ws": "^8.14.1"
+    },
+    "devDependencies": {
+        "@types/i2c-bus": "^5.1.1",
+        "@types/node": "^20.6.0",
+        "@types/ws": "^8.5.5",
+        "ts-node-dev": "^2.0.0"
+    }
+}
