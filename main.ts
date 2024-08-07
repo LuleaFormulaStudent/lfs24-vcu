@@ -30,7 +30,7 @@ export default class Main {
 
     version: string = package_info.version
 
-    constructor() {
+    async init() {
         this.logs_controller = new LogsController(this)
         this.data_controller = new DataController(this)
         this.status_led = new StatusLed(this)
@@ -39,9 +39,7 @@ export default class Main {
         this.brake_controller = new BrakeController(this)
         this.steering_wheel_controller = new SteeringWheelController(this)
         this.mavlink_controller = new MavlinkController(this)
-    }
 
-    async init() {
         await this.logs_controller.info("Starting initialization of system..")
         await this.logs_controller.info("Version: " + this.version)
         if (process.env.NODE_ENV == 'production') {
