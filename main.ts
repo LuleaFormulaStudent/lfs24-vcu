@@ -34,7 +34,6 @@ export default class Main {
         this.logs_controller = new LogsController(this)
         await this.logs_controller.info("Starting initialization of system..")
         await this.logs_controller.info("Version: " + this.version)
-        await this.setSystemState(MavState.BOOT)
 
         await this.logs_controller.info("Starting initializing constructors..")
         this.logs_controller = new LogsController(this)
