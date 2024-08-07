@@ -9,7 +9,7 @@ export default class DS3502 {
     private static MIN_VAL =  0
 
     constructor(private adress: number = 0x28, private bus_num: number = 1) {
-        if (os.arch() == "arm") {
+        if (os.arch().startsWith("arm")) {
             this.i2c_device = require("i2c-bus").openSync(this.bus_num)
             this.i2c_device.writeByteSync(this.adress, this.DS3502_MODE, 0x80)
         }
