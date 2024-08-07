@@ -268,6 +268,8 @@ export default class DataController extends ParamsHandler {
             [this.params.ind_1_raw_val, this.params.ind_2_raw_val, this.params.ind_3_raw_val, this.params.ind_4_raw_val] = data
         })
 
+        this.co_mcu.on("error", (err) => this.main.logs_controller.error("CoMCU Error:", err))
+
         this.gps.on("data", (packet: any) => {
             Object.assign(this.params, packet)
         })
