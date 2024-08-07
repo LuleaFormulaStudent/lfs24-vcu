@@ -8,7 +8,7 @@ import MavlinkController from "./src/controllers/mavlink_controller.js";
 import {MavState} from "mavlink-mappings/dist/lib/minimal.js";
 import {createServer, Server, Socket} from "node:net";
 import LogsController from "./src/controllers/logs_controller.js";
-import package_info from "./package.json" assert { type: "json" };
+import package_info from "./package.json" assert {type: "json"};
 
 export default class Main {
 
@@ -31,6 +31,11 @@ export default class Main {
     version: string = package_info.version
 
     async init() {
+        await this.logs_controller.info("Starting initialization of system..")
+        await this.logs_controller.info("Version: " + this.version)
+        await this.setSystemState(MavState.BOOT)
+
+        await this.logs_controller.info("Starting initializing constructors..")
         this.logs_controller = new LogsController(this)
         this.data_controller = new DataController(this)
         this.status_led = new StatusLed(this)
@@ -39,9 +44,8 @@ export default class Main {
         this.brake_controller = new BrakeController(this)
         this.steering_wheel_controller = new SteeringWheelController(this)
         this.mavlink_controller = new MavlinkController(this)
+        await this.logs_controller.info("Initializing constructors done!")
 
-        await this.logs_controller.info("Starting initialization of system..")
-        await this.logs_controller.info("Version: " + this.version)
         if (process.env.NODE_ENV == 'production') {
             this.in_production = true
             await this.logs_controller.info("System is in production mode.")
@@ -127,10 +131,15 @@ export default class Main {
 
 
         await this.logs_controller.info("Done initializing system!")
-        this.data_controller.params.system_status = MavState.STANDBY
+        await this.setSystemState(MavState.STANDBY)
     }
 
-    set_driving_mode(mode: DrivingMode) {
+    async setSystemState(state: MavState) {
+        this.data_controller.params.system_state = state
+        await this.logs_controller.info("Setting system in " + MavState[state].toLowerCase())
+    }
+
+    setDrivingMode(mode: DrivingMode) {
         this.data_controller.params.driving_mode = mode
         if (this.in_production) {
             if (this.data_controller.params.driving_mode == DrivingMode.DRIVING_MODE_NEUTRAL) {

@@ -14,6 +14,8 @@ export default class SteeringWheelController {
             this.port = new SerialPort({path: "/dev/serial0", baudRate: 115200});
             this.readLineParser = this.port.pipe(new ReadlineParser({delimiter: '\n'}))
         }
+
+        this.main.logs_controller.info("Steering wheel controller constructor initialized!")
     }
 
     async init() {
@@ -24,14 +26,14 @@ export default class SteeringWheelController {
                     const [event, val] = Object.entries(data)[0];
                     if (event == "btn_p" && val == 3) {
                         this.driving_mode_forward_timeout = setTimeout(() => {
-                            this.main.set_driving_mode(1)
+                            this.main.setDrivingMode(1)
                         }, 2000)
                     } else if (event == "btn_r" && val == 3) {
                         clearTimeout(this.driving_mode_forward_timeout)
                     }
                     if (event == "btn_p" && val == 2) {
                         this.driving_mode_forward_timeout = setTimeout(() => {
-                            this.main.set_driving_mode(0)
+                            this.main.setDrivingMode(0)
                         }, 200)
                     } else if (event == "btn_r" && val == 2) {
                         clearTimeout(this.driving_mode_forward_timeout)

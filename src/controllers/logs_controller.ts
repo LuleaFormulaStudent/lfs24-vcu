@@ -8,7 +8,9 @@ export default class LogsController  {
     log_id: number = -1
     ready_to_send = false
 
-    constructor(private main: Main) {}
+    constructor(private main: Main) {
+        this.main.logs_controller.info("Logs controller constructor initialized!")
+    }
 
     async init() {
 

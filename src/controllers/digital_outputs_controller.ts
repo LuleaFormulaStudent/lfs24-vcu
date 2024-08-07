@@ -9,6 +9,7 @@ export default class DigitalOutputsController  {
         if (this.main.in_production) {
             this.board = new RelayBoard()
         }
+        this.main.logs_controller.info("Digital output controller constructor initialized!")
     }
 
     async init() {

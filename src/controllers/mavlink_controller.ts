@@ -53,6 +53,7 @@ export default class MavlinkController {
             registerCustomMessageMagicNumber((message as MavLinkDataConstructor<MavLinkData>).MSG_ID.toString(),
                 (message as MavLinkDataConstructor<MavLinkData>).MAGIC_NUMBER)
         }
+        this.main.logs_controller.info("Mavlink controller constructor initialized!")
     }
 
     async init() {
@@ -68,7 +69,7 @@ export default class MavlinkController {
         this.heartbeat.type = MavType.GROUND_ROVER
         this.heartbeat.autopilot = MavAutopilot.GENERIC
         this.heartbeat.baseMode = MavModeFlag.MANUAL_INPUT_ENABLED
-        this.heartbeat.systemStatus = this.main.data_controller.params.system_status
+        this.heartbeat.systemStatus = this.main.data_controller.params.system_state
 
         this.port
             .pipe(new MavLinkPacketSplitter())
@@ -89,7 +90,7 @@ export default class MavlinkController {
                 }
             })
             .on("error", (err) => {
-                console.error("Port Error:", err)
+                this.main.logs_controller.error("Port Error:", err)
             })
 
         if (this.port instanceof SerialPort) {

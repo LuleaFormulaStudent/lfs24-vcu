@@ -25,7 +25,7 @@ export default class DataController extends ParamsHandler {
     constructor(private main: Main) {
         super({
             g_constant: 9.82,
-            system_status: MavState.BOOT as MavState,
+            c: MavState.BOOT as MavState,
             driving_mode: DrivingMode.DRIVING_MODE_NEUTRAL as DrivingMode,
             throttle_raw_val: 0,
             throttle_input: 0,
@@ -230,6 +230,7 @@ export default class DataController extends ParamsHandler {
         })
 
         this.inlfuxdb_client = inlfuxdb.getWriteApi(process.env.DOCKER_INFLUXDB_INIT_ORG, process.env.DOCKER_INFLUXDB_INIT_BUCKET, 'us')
+        this.main.logs_controller.info("Data controller constructors initialized!")
     }
 
     async init() {
