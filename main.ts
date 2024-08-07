@@ -51,45 +51,43 @@ export default class Main {
             await this.logs_controller.info("System is in development mode.")
         }
 
-        if (!this.in_production) {
-            await this.logs_controller.info("Initializing TCP server..")
-            this.tcp_server = createServer()
+        await this.logs_controller.info("Initializing TCP server..")
+        this.tcp_server = createServer()
 
-            this.tcp_server.on('error', (err) => {
-                this.logs_controller.error("TCP Server error:", err)
-            });
+        this.tcp_server.on('error', (err) => {
+            this.logs_controller.error("TCP Server error:", err)
+        });
 
-            this.tcp_server.on('connection', async (socket) => {
-                this.tcp_server_connections.push(socket);
-                await this.logs_controller.info("New connection to client.")
+        this.tcp_server.on('connection', async (socket) => {
+            this.tcp_server_connections.push(socket);
+            await this.logs_controller.info("New connection to client.")
 
-                socket.on("error", (err) => {
-                    this.logs_controller.error("Error on client socket", err)
-                })
+            socket.on("error", (err) => {
+                this.logs_controller.error("Error on client socket", err)
+            })
 
-                socket.on("data", (data) => {
-                    this.tcp_server_connections.forEach((connection) => {
-                        if (connection !== socket) {
-                            connection.write(data);
-                        }
-                    });
-                })
-
-                socket.on('close', () => {
-                    this.tcp_server_connections.splice(this.tcp_server_connections.indexOf(socket), 1);
+            socket.on("data", (data) => {
+                this.tcp_server_connections.forEach((connection) => {
+                    if (connection !== socket) {
+                        connection.write(data);
+                    }
                 });
-            });
+            })
 
-            this.tcp_server.listen({port: 5432, host: "0.0.0.0"}, () => {
-                this.logs_controller.info("TCP Server started!")
+            socket.on('close', () => {
+                this.tcp_server_connections.splice(this.tcp_server_connections.indexOf(socket), 1);
             });
-        }
+        });
+
+        this.tcp_server.listen({port: 5432, host: "0.0.0.0"}, () => {
+            this.logs_controller.info("TCP Server started!")
+        });
 
         if (this.in_sim_mode) {
             await this.logs_controller.info("Initializing Simulink server..")
             this.simulink_server = createServer()
 
-            this.tcp_server.on('error', (err) => {
+            this.simulink_server.on('error', (err) => {
                 this.logs_controller.error("Simulink server error:", err)
             });
 
