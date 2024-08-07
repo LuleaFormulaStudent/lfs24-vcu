@@ -8,6 +8,7 @@ import MavlinkController from "./src/controllers/mavlink_controller.js";
 import {MavState} from "mavlink-mappings/dist/lib/minimal.js";
 import {createServer, Server, Socket} from "node:net";
 import LogsController from "./src/controllers/logs_controller.js";
+import package_info from "./package.json" assert { type: "json" };
 
 export default class Main {
 
@@ -27,7 +28,7 @@ export default class Main {
     tcp_server_connections: Socket[] = []
     simulink_server: Server
 
-    version: string = require("package.json").version
+    version: string = package_info.version
 
     constructor() {
         this.logs_controller = new LogsController(this)
