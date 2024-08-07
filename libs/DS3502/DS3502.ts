@@ -8,6 +8,9 @@ export default class DS3502 {
     private static MAX_VAL = 127
     private static MIN_VAL =  0
 
+    private DS3502_WIPER = 0x00
+    private DS3502_MODE = 0x02
+
     constructor(private adress: number = 0x28, private bus_num: number = 1) {
         if (os.arch().startsWith("arm")) {
             import("i2c-bus").then(async (i2c) => {
@@ -17,9 +20,6 @@ export default class DS3502 {
             });
         }
     }
-
-    DS3502_WIPER = 0x00
-    DS3502_MODE = 0x02
 
     read(): number {
         try {

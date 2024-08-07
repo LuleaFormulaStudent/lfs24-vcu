@@ -255,17 +255,23 @@ export default class DataController extends ParamsHandler {
         })
 
         if (this.main.in_production) {
-            setInterval(async () => {
-                [this.params.throttle_raw_val, this.params.brake_raw_val] = await this.co_mcu.read_analog_sensors()
-                this.params.throttle_output = map_range(this.params.throttle_raw_val, this.params.throttle_raw_min, this.params.throttle_raw_max, 0, 1)
-                this.params.brake_output = map_range(this.params.brake_raw_val, this.params.brake_raw_min, this.params.brake_raw_max, 0, 1)
-                    [this.params.ind_1_raw_val, this.params.ind_2_raw_val, this.params.ind_3_raw_val, this.params.ind_4_raw_val] = await this.co_mcu.read_ind_sensors()
-            }, this.params.data_fetch_time)
-
-            this.gps.on("data", (packet: any) => {
-                Object.assign(this.params, packet)
-            })
+            this.co_mcu.startPoll(20)
         }
+
+        this.co_mcu.on("analog_sensors", (data) => {
+            [this.params.throttle_raw_val, this.params.brake_raw_val] = data
+            this.params.throttle_output = map_range(this.params.throttle_raw_val, this.params.throttle_raw_min, this.params.throttle_raw_max, 0, 1)
+            this.params.brake_output = map_range(this.params.brake_raw_val, this.params.brake_raw_min, this.params.brake_raw_max, 0, 1)
+        })
+
+        this.co_mcu.on("ind_sensors", (data) => {
+            [this.params.ind_1_raw_val, this.params.ind_2_raw_val, this.params.ind_3_raw_val, this.params.ind_4_raw_val] = data
+        })
+
+        this.gps.on("data", (packet: any) => {
+            Object.assign(this.params, packet)
+        })
+
         this.addParamListener("gps_speed", ({value}) => {
             this.params.vehicle_speed = Math.round(value * 3.6)
         })
