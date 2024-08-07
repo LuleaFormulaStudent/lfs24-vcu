@@ -10,8 +10,9 @@ export default class DS3502 {
 
     constructor(private adress: number = 0x28, private bus_num: number = 1) {
         if (os.arch().startsWith("arm")) {
-            import("i2c-bus").then((i2c) => {
+            import("i2c-bus").then(async (i2c) => {
                 this.i2c_device = i2c.openSync(this.bus_num)
+                await sleep(10)
                 this.i2c_device.writeByteSync(this.adress, this.DS3502_MODE, 0x80)
             });
         }
@@ -20,14 +21,24 @@ export default class DS3502 {
     DS3502_WIPER = 0x00
     DS3502_MODE = 0x02
 
-    read() {
-        return this.i2c_device.readByteSync(this.adress, this.DS3502_WIPER)
+    read(): number {
+        try {
+            if (this.i2c_device) {
+                return this.i2c_device.readByteSync(this.adress, this.DS3502_WIPER)
+            } else {
+                return -1
+            }
+        } catch (e) {
+            return -1
+        }
     }
 
     //v = 0-1
     write(v: number) {
         try {
-            this.i2c_device.writeByteSync(this.adress, this.DS3502_WIPER, this.to_safe(v))
+            if (this.i2c_device) {
+                this.i2c_device.writeByteSync(this.adress, this.DS3502_WIPER, this.to_safe(v))
+            }
             return true
         } catch (e) {
             return false
@@ -43,11 +54,15 @@ export default class DS3502 {
             return false
         } else {
             try {
-                this.i2c_device.writeByteSync(this.adress, this.DS3502_MODE, 0x00)
-                this.i2c_device.writeByteSync(this.adress, this.DS3502_WIPER, this.to_safe(v))
-                await sleep(100);
-                this.i2c_device.writeByteSync(this.adress, this.DS3502_MODE, 0x80)
-                return true
+                if (this.i2c_device) {
+                    this.i2c_device.writeByteSync(this.adress, this.DS3502_MODE, 0x00)
+                    this.i2c_device.writeByteSync(this.adress, this.DS3502_WIPER, this.to_safe(v))
+                    await sleep(100);
+                    this.i2c_device.writeByteSync(this.adress, this.DS3502_MODE, 0x80)
+                    return true
+                } else {
+                    return false
+                }
             } catch (e) {
                 return false
             }

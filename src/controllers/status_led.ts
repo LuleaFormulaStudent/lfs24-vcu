@@ -24,7 +24,7 @@ export default class StatusLed {
                 this.red_led.writeSync(state ? 1 : 0)
             }
         } catch (e) {
-            console.error(e)
+            this.main.logs_controller.error("Error when changing state of red led: ", e)
         }
     }
 
@@ -35,7 +35,7 @@ export default class StatusLed {
                 this.green_led.writeSync(state ? 1 : 0)
             }
         } catch (e) {
-            console.error(e)
+            this.main.logs_controller.error("Error when changing state of green led: ", e)
         }
     }
 
@@ -46,7 +46,7 @@ export default class StatusLed {
                 this.blue_led.writeSync(state ? 1 : 0)
             }
         } catch (e) {
-            console.error(e)
+            this.main.logs_controller.error("Error when changing state of blue led: ", e)
         }
     }
 
