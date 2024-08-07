@@ -47,7 +47,9 @@ export default class ADS1115 {
 
     constructor(private adress: number = 0x48, private bus_num: number = 1) {
         if (os.arch().startsWith("arm")) {
-            this.i2c_device = require("i2c-bus").openSync(this.bus_num)
+            import("i2c-bus").then((i2c) => {
+                this.i2c_device = i2c.openSync(this.bus_num)
+            })
         }
     }
 

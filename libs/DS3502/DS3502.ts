@@ -10,8 +10,10 @@ export default class DS3502 {
 
     constructor(private adress: number = 0x28, private bus_num: number = 1) {
         if (os.arch().startsWith("arm")) {
-            this.i2c_device = require("i2c-bus").openSync(this.bus_num)
-            this.i2c_device.writeByteSync(this.adress, this.DS3502_MODE, 0x80)
+            import("i2c-bus").then((i2c) => {
+                this.i2c_device = i2c.openSync(this.bus_num)
+                this.i2c_device.writeByteSync(this.adress, this.DS3502_MODE, 0x80)
+            });
         }
     }
 
@@ -22,7 +24,7 @@ export default class DS3502 {
         return this.i2c_device.readByteSync(this.adress, this.DS3502_WIPER)
     }
 
-    //v = 0 -> 1
+    //v = 0-1
     write(v: number) {
         try {
             this.i2c_device.writeByteSync(this.adress, this.DS3502_WIPER, this.to_safe(v))

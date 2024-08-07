@@ -6,20 +6,34 @@ export default class VCUCoMcu {
 
     constructor(private adress: number = 12, private bus_num: number = 1) {
         if (os.arch().startsWith("arm")) {
-            this.i2c_device = require("i2c-bus").openSync(this.bus_num)
+            import("i2c-bus").then((i2c) => {
+                this.i2c_device = i2c.openSync(this.bus_num)
+            })
         }
     }
 
     async read_analog_sensors() {
-        const buffer = Buffer.alloc(3)
-        this.i2c_device.readI2cBlockSync(this.adress, 123, 3, buffer)
-        return [buffer.readUInt8(2), buffer.readUInt8(1), buffer.readUInt8(0)]
+        try {
+            if (this.i2c_device) {
+                const buffer = Buffer.alloc(3)
+                this.i2c_device.readI2cBlockSync(this.adress, 123, 3, buffer)
+                return [buffer.readUInt8(2), buffer.readUInt8(1), buffer.readUInt8(0)]
+            } else {
+                return []
+            }
+        } catch (e) {
+            console.error(e)
+        }
     }
 
     async read_ind_sensors() {
-        const buffer = Buffer.alloc(8)
-        this.i2c_device.readI2cBlockSync(this.adress, 124, 8, buffer)
+        if(this.i2c_device) {
+            const buffer = Buffer.alloc(8)
+            this.i2c_device.readI2cBlockSync(this.adress, 124, 8, buffer)
 
-        return [buffer.readUInt16LE(6), buffer.readUInt16LE(4), buffer.readUInt16LE(2), buffer.readUInt16LE(0)]
+            return [buffer.readUInt16LE(6), buffer.readUInt16LE(4), buffer.readUInt16LE(2), buffer.readUInt16LE(0)]
+        } else {
+            return []
+        }
     }
 }
