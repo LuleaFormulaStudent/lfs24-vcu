@@ -230,7 +230,7 @@ export default class DataController extends ParamsHandler {
         })
 
         this.inlfuxdb_client = inlfuxdb.getWriteApi(process.env.DOCKER_INFLUXDB_INIT_ORG, process.env.DOCKER_INFLUXDB_INIT_BUCKET, 'us')
-        this.main.logs_controller.info("Data controller constructors initialized!")
+        this.main.logs_controller.debug("Data controller constructors initialized!")
     }
 
     async init() {

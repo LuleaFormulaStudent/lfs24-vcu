@@ -9,7 +9,7 @@ export default class BrakeController {
         if (this.main.in_production) {
             this.device = new DS3502(0x29)
         }
-        this.main.logs_controller.info("Brake controller constructor initialized!")
+        this.main.logs_controller.debug("Brake controller constructor initialized!")
     }
 
     async init() {

@@ -35,8 +35,14 @@ export default class Main {
         await this.logs_controller.info("Starting initialization of system..")
         await this.logs_controller.info("Version: " + this.version)
 
+        if (process.env.NODE_ENV == 'production') {
+            this.in_production = true
+            await this.logs_controller.info("System is in production mode.")
+        } else {
+            await this.logs_controller.info("System is in development mode.")
+        }
+
         await this.logs_controller.info("Starting initializing constructors..")
-        this.logs_controller = new LogsController(this)
         this.data_controller = new DataController(this)
         this.status_led = new StatusLed(this)
         this.throttle_controller = new ThrottleController(this)
@@ -45,13 +51,6 @@ export default class Main {
         this.steering_wheel_controller = new SteeringWheelController(this)
         this.mavlink_controller = new MavlinkController(this)
         await this.logs_controller.info("Initializing constructors done!")
-
-        if (process.env.NODE_ENV == 'production') {
-            this.in_production = true
-            await this.logs_controller.info("System is in production mode.")
-        } else {
-            await this.logs_controller.info("System is in development mode.")
-        }
 
         await this.logs_controller.info("Initializing TCP server..")
         this.tcp_server = createServer()
@@ -121,9 +120,8 @@ export default class Main {
                 this.logs_controller.info("Simulink server started!")
             });
         }
-
-        await this.digital_outputs_controller.init()
         await this.data_controller.init()
+        await this.digital_outputs_controller.init()
         await this.throttle_controller.init()
         await this.brake_controller.init()
         await this.steering_wheel_controller.init()

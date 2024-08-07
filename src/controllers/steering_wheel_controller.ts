@@ -15,7 +15,7 @@ export default class SteeringWheelController {
             this.readLineParser = this.port.pipe(new ReadlineParser({delimiter: '\n'}))
         }
 
-        this.main.logs_controller.info("Steering wheel controller constructor initialized!")
+        this.main.logs_controller.debug("Steering wheel controller constructor initialized!")
     }
 
     async init() {

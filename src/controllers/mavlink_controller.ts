@@ -53,7 +53,7 @@ export default class MavlinkController {
             registerCustomMessageMagicNumber((message as MavLinkDataConstructor<MavLinkData>).MSG_ID.toString(),
                 (message as MavLinkDataConstructor<MavLinkData>).MAGIC_NUMBER)
         }
-        this.main.logs_controller.info("Mavlink controller constructor initialized!")
+        this.main.logs_controller.debug("Mavlink controller constructor initialized!")
     }
 
     async init() {

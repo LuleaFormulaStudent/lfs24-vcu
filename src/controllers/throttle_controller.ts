@@ -9,7 +9,7 @@ export default class ThrottleController {
         if (this.main.in_production) {
             this.device = new DS3502(0x28)
         }
-        this.main.logs_controller.info("Throttle controller constructor initialized!")
+        this.main.logs_controller.debug("Throttle controller constructor initialized!")
     }
 
     async init() {

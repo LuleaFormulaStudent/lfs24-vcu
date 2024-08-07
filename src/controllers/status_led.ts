@@ -14,7 +14,7 @@ export default class StatusLed {
             this.blue_led = new Gpio(538, 'out');
         }
 
-        this.main.logs_controller.info("Status LED constructors initialized!")
+        this.main.logs_controller.debug("Status LED constructors initialized!")
     }
 
     setRedLED(state: boolean) {
