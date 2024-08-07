@@ -31,6 +31,7 @@ export default class Main {
     version: string = package_info.version
 
     async init() {
+        this.logs_controller = new LogsController(this)
         await this.logs_controller.info("Starting initialization of system..")
         await this.logs_controller.info("Version: " + this.version)
         await this.setSystemState(MavState.BOOT)
