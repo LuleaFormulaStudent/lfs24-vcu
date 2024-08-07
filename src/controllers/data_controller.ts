@@ -218,18 +218,18 @@ export default class DataController extends ParamsHandler {
             }
         })
 
+        if (this.main.in_production) {
+            this.gps = new GPSDriver()
+            this.co_mcu = new VCUCoMcu()
+            this.ads = new ADS1115()
+        }
+
         const inlfuxdb = new InfluxDB({
             url: process.env.DOCKER_INFLUXDB_URL,
             token: process.env.DOCKER_INFLUXDB_TOKEN
         })
 
         this.inlfuxdb_client = inlfuxdb.getWriteApi(process.env.DOCKER_INFLUXDB_INIT_ORG, process.env.DOCKER_INFLUXDB_INIT_BUCKET, 'us')
-
-        if (this.main.in_production) {
-            this.ads = new ADS1115()
-            this.co_mcu = new VCUCoMcu()
-            this.gps = new GPSDriver()
-        }
     }
 
     async init() {
