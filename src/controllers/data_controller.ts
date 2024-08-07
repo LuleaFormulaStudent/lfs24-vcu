@@ -6,6 +6,7 @@ import GPSDriver from "../../libs/gps/gps_driver.js";
 import {MavState} from "mavlink-mappings/dist/lib/minimal.js";
 import {common} from "node-mavlink";
 import ParamsHandler from "../params_handler.js";
+import {InfluxDB, Point, WriteApi} from "@influxdata/influxdb-client";
 
 export enum DrivingMode {
     DRIVING_MODE_NEUTRAL = 0,
@@ -18,6 +19,8 @@ export default class DataController extends ParamsHandler {
     ads: ADS1115
     co_mcu: VCUCoMcu
     gps: GPSDriver
+
+    inlfuxdb_client: WriteApi
 
     constructor(private main: Main) {
         super({
@@ -215,6 +218,13 @@ export default class DataController extends ParamsHandler {
             }
         })
 
+        const inlfuxdb = new InfluxDB({
+            url: process.env.DOCKER_INFLUXDB_URL,
+            token: process.env.DOCKER_INFLUXDB_TOKEN
+        })
+
+        this.inlfuxdb_client = inlfuxdb.getWriteApi(process.env.DOCKER_INFLUXDB_INIT_ORG, process.env.DOCKER_INFLUXDB_INIT_BUCKET, 'us')
+
         if (this.main.in_production) {
             this.ads = new ADS1115()
             this.co_mcu = new VCUCoMcu()
@@ -226,6 +236,21 @@ export default class DataController extends ParamsHandler {
         await this.main.logs_controller.info("Initializing data controller..")
         this.on("error", (err) => {
             this.main.logs_controller.error("Error with data:", err)
+        })
+
+        this.on("change", ({param, value}) => {
+            let point = new Point('measurements')
+                .tag('type', 'param')
+                .timestamp("")
+            if (typeof value == "string") {
+                point.stringField(param, value)
+            } else if (typeof value == "number") {
+                point.floatField(param, value)
+            } else if (typeof value == "boolean") {
+                point.booleanField(param, value)
+            }
+            this.inlfuxdb_client.writePoints([point])
+            this.inlfuxdb_client.flush()
         })
 
         if (this.main.in_production) {
@@ -258,10 +283,10 @@ export default class DataController extends ParamsHandler {
     }
 
     onSimData(values: number[]) {
-        this.params.hv_cur_amp =  values[0]
-        this.params.hv_cons_energy =  values[1]
-        this.params.hv_cur_voltage =  values[3]
-        this.params.hv_temp =  values[4] - 273.15
+        this.params.hv_cur_amp = values[0]
+        this.params.hv_cons_energy = values[1]
+        this.params.hv_cur_voltage = values[3]
+        this.params.hv_temp = values[4] - 273.15
         this.params.hv_bdi = values[5]
         this.params.gps_latitude = values[6]
         this.params.gps_longitude = values[7]

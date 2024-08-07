@@ -27,6 +27,8 @@ export default class Main {
     tcp_server_connections: Socket[] = []
     simulink_server: Server
 
+    version: string = require("package.json").version
+
     constructor() {
         this.logs_controller = new LogsController(this)
         this.data_controller = new DataController(this)
@@ -40,6 +42,14 @@ export default class Main {
 
     async init() {
         await this.logs_controller.info("Starting initialization of system..")
+        await this.logs_controller.info("Version: " + this.version)
+        if (process.env.NODE_ENV == 'production') {
+            this.in_production = true
+            await this.logs_controller.info("System is in production mode.")
+        } else {
+            await this.logs_controller.info("System is in development mode.")
+        }
+
         if (!this.in_production) {
             await this.logs_controller.info("Initializing TCP server..")
             this.tcp_server = createServer()
