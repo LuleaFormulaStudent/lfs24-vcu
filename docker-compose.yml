@@ -32,11 +32,9 @@ services:
         environment:
             NODE_ENV: production
         devices:
-            - /dev/serial0
-            - /dev/AMA2
-            - /dev/AMA5
-            - /dev/i2c-1
-
+            - "/dev/serial0:/dev/serial0"
+            - "/dev/AMA2:/dev/AMA2"
+            - "/dev/AMA5:/dev/AMA5"
 
 networks:
     lfs-network:

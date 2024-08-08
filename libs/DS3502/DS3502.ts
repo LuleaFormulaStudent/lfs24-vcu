@@ -45,8 +45,9 @@ export default class DS3502 extends EventEmitter {
         try {
             if (this.i2c_device) {
                 this.i2c_device.writeByteSync(this.adress, this.DS3502_WIPER, this.to_safe(v))
+                return true
             }
-            return true
+            return false
         } catch (e) {
             return false
         }
