@@ -39,4 +39,4 @@ async function generateFiles(filenames: string[], output_path: string) {
 generateFiles(fs.readdirSync("mavlink")
         .filter((file) => file.endsWith(".xml"))
         .map((file) => path.join("mavlink", file)),
-    "libs/mavlink")
+    "mavlink")

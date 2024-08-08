@@ -258,11 +258,11 @@ export default class DataController extends ParamsHandler {
             this.co_mcu.startPoll(20)
         }
 
-        this.co_mcu.on("analog_sensors", (data) => {
+        /*this.co_mcu.on("analog_sensors", (data) => {
             [this.params.throttle_raw_val, this.params.brake_raw_val] = data
             this.params.throttle_output = map_range(this.params.throttle_raw_val, this.params.throttle_raw_min, this.params.throttle_raw_max, 0, 1)
             this.params.brake_output = map_range(this.params.brake_raw_val, this.params.brake_raw_min, this.params.brake_raw_max, 0, 1)
-        })
+        })*/
 
         this.co_mcu.on("ind_sensors", (data) => {
             [this.params.ind_1_raw_val, this.params.ind_2_raw_val, this.params.ind_3_raw_val, this.params.ind_4_raw_val] = data

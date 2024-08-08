@@ -26,7 +26,7 @@ import {
     MavParamType
 } from "mavlink-mappings/dist/lib/common.js";
 import {sleep} from "../helper_functions.js";
-import * as lfs from "../../libs/mavlink/lfs.js";
+import * as lfs from "../../mavlink/lfs.js";
 
 export default class MavlinkController {
 
@@ -75,7 +75,7 @@ export default class MavlinkController {
             .pipe(new MavLinkPacketSplitter())
             .pipe(new MavLinkPacketParser())
             .pipe(this.heartbeat)
-            .pipe(this.ftp)
+            //.pipe(this.ftp)
             .resume()
             .on('data', async (packet: MavLinkPacket) => {
                 const clazz: MavLinkDataConstructor<MavLinkData> = this.REGISTRY[packet.header.msgid]
