@@ -1,6 +1,6 @@
 services:
-    influxdb:
-        container_name: influxdb-database
+    database:
+        container_name: influxdb
         image: influxdb
         restart: always
         networks:
@@ -29,8 +29,6 @@ services:
             - ./data:/lfs-vcu/data
         extra_hosts:
             - "host.docker.internal:host-gateway"
-        environment:
-            NODE_ENV: production
         devices:
             - "/dev/serial0:/dev/serial0"
             - "/dev/AMA2:/dev/AMA2"

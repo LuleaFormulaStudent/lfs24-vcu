@@ -6,7 +6,7 @@
     "type": "module",
     "scripts": {
         "dev": "dotenv -- node --loader ts-node/esm --experimental-specifier-resolution=node main.ts",
-        "prod": "node dist/main.js",
+        "prod": "dotenv -v NODE_ENV=production -- node dist/main.js",
         "gen-mavlink": "node --loader ts-node/esm mavlink/gen_mavlink_mappings.ts",
         "build": "tsc -project tsconfig.json"
     },
