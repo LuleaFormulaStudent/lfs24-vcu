@@ -36,7 +36,8 @@ async function generateFiles(filenames: string[], output_path: string) {
     }
 }
 
+console.log("[MAVLINK GENERATOR] Starting generate reference files.")
 generateFiles(fs.readdirSync("mavlink")
-        .filter((file) => file.endsWith(".xml"))
-        .map((file) => path.join("mavlink", file)),
-    "mavlink")
+    .filter((file) => file.endsWith(".xml"))
+    .map((file) => path.join("mavlink", file)), "mavlink")
+    .then(() => console.log("[MAVLINK GENERATOR] Done generating reference files!"))
