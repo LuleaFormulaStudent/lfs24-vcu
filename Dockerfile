@@ -5,7 +5,7 @@ WORKDIR lfs-vcu
 COPY package.json .
 RUN npm install
 
-COPY mavlink .
+COPY mavlink mavlink
 RUN npm run gen-mavlink
 
 COPY . .

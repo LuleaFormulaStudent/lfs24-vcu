@@ -64,7 +64,7 @@ export default class MavlinkController {
         }
 
         this.mavlink_protocol = new MavLinkProtocolV2(this.SYS_ID, this.COMP_ID)
-        this.ftp = new MavFTP(<Writable>this.port, {protocol: this.mavlink_protocol});
+        //this.ftp = new MavFTP(<Writable>this.port, {protocol: this.mavlink_protocol});
         this.heartbeat = new Heartbeat(<Writable>this.port, {protocol: this.mavlink_protocol})
         this.heartbeat.type = MavType.GROUND_ROVER
         this.heartbeat.autopilot = MavAutopilot.GENERIC
