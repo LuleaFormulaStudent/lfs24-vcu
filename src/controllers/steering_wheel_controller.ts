@@ -11,7 +11,7 @@ export default class SteeringWheelController {
 
     constructor(private main: Main) {
         if (this.main.in_production) {
-            this.port = new SerialPort({path: "/dev/serial0", baudRate: 115200});
+            this.port = new SerialPort({path: "/dev/ttyAMA0", baudRate: 115200});
             this.readLineParser = this.port.pipe(new ReadlineParser({delimiter: '\n'}))
         }
 
