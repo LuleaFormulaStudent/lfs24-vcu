@@ -31,6 +31,12 @@ services:
             - "host.docker.internal:host-gateway"
         environment:
             NODE_ENV: production
+        devices:
+            - /dev/serial0
+            - /dev/AMA2
+            - /dev/AMA5
+            - /dev/i2c-1
+
 
 networks:
     lfs-network:
