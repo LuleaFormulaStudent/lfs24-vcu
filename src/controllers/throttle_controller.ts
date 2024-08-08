@@ -8,6 +8,7 @@ export default class ThrottleController {
     constructor(private main: Main) {
         if (this.main.in_production) {
             this.device = new DS3502(0x28)
+            this.device.on("error", (err) => this.main.logs_controller.error("Error with i2c Device:", err))
         }
         this.main.logs_controller.debug("Throttle controller constructor initialized!")
     }

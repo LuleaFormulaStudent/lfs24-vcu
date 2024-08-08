@@ -11,8 +11,13 @@ export default class VCUCoMcu extends EventEmitter {
     constructor(private adress: number = 12, private bus_num: number = 1) {
         super()
         if (os.arch().startsWith("arm")) {
-            import("i2c-bus").then((i2c) => {
+            import("i2c-bus").then(async (i2c) => {
                 this.i2c_device = i2c.openSync(this.bus_num)
+                await sleep(10)
+                const result = this.i2c_device.scanSync(adress)
+                if (!result.includes(adress)) {
+                    this.emit("error", new Error("Co MCU is not found at adress, " + adress))
+                }
             })
         }
     }

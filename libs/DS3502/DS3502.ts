@@ -1,8 +1,9 @@
 import {I2CBus} from "i2c-bus"
 import {sleep} from "../../src/helper_functions.js";
 import os from "os";
+import EventEmitter from "node:events";
 
-export default class DS3502 {
+export default class DS3502 extends EventEmitter {
     private i2c_device: I2CBus
 
     private static MAX_VAL = 127
@@ -12,11 +13,17 @@ export default class DS3502 {
     private DS3502_MODE = 0x02
 
     constructor(private adress: number = 0x28, private bus_num: number = 1) {
+        super()
         if (os.arch().startsWith("arm")) {
             import("i2c-bus").then(async (i2c) => {
                 this.i2c_device = i2c.openSync(this.bus_num)
                 await sleep(10)
-                this.i2c_device.writeByteSync(this.adress, this.DS3502_MODE, 0x80)
+                const result = this.i2c_device.scanSync(adress)
+                if (result.includes(adress)) {
+                    this.i2c_device.writeByteSync(this.adress, this.DS3502_MODE, 0x80)
+                } else {
+                    this.emit("error", new Error("DS3502 device not found at adress, " + adress))
+                }
             });
         }
     }

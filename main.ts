@@ -9,6 +9,7 @@ import {MavState} from "mavlink-mappings/dist/lib/minimal.js";
 import {createServer, Server, Socket} from "node:net";
 import LogsController from "./src/controllers/logs_controller.js";
 import package_info from "./package.json" assert {type: "json"};
+import {sleep} from "node-mavlink";
 
 export default class Main {
 
