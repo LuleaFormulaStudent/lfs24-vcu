@@ -19,7 +19,7 @@ services:
         env_file: ./.env
         privileged: true
         depends_on:
-            - influxdb
+            - database
         networks:
             - lfs-network
         ports:
