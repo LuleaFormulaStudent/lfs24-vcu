@@ -8,6 +8,8 @@ export default class LogsController  {
     log_id: number = -1
     ready_to_send = false
 
+    chunk_size = 47
+
     constructor(private main: Main) {}
 
     async init() {
@@ -65,19 +67,26 @@ export default class LogsController  {
         }
     }
 
-    private async sendLogMsg(id: number, severity: common.MavSeverity, text: string,) {
-        const chunks = Math.ceil(text.length / 50)
+    private async sendLogMsg(id: number, severity: common.MavSeverity, text: string) {
+        const chunks = Math.ceil(text.length / this.chunk_size)
+
         for (let chunk_id = 0; chunk_id < chunks; chunk_id++) {
             const msg = new common.StatusText()
             msg.severity = severity
             msg.id = id
-            msg.text = text.substring(chunk_id*50, (chunk_id + 1)*50)
+            msg.text = text.substring(chunk_id*this.chunk_size, (chunk_id + 1)*this.chunk_size)
             msg.chunkSeq = chunk_id
-            await this.main.mavlink_controller.send(msg)
+            if (chunk_id >= chunks - 1) {
+                msg.text += "<@>"
+            }
+            if (!await this.main.mavlink_controller.send(msg)) {
+                console.log("Failed to send log")
+            }
             if (chunk_id != chunks - 1) {
-                await sleep(10)
+                await sleep(50)
             }
         }
+
     }
 
     async onLogListRequest(start_id: number, end_id: number) {
@@ -92,7 +101,7 @@ export default class LogsController  {
 
             for (let i: number = start_id; i < Math.min(end_id + 1, this.logs.length); i++) {
                 await this.sendLogMsg(this.logs[i].id, this.logs[i].severity, this.logs[i].text)
-                await sleep(50)
+                await sleep(100)
             }
             this.ready_to_send = true
         } catch(err) {

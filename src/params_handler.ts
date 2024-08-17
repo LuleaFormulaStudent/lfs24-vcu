@@ -26,15 +26,15 @@ export default class ParamsHandler extends EventEmitter {
                             this["_" + param] = value
                             if (this.__this.events.hasOwnProperty(param)) {
                                 this.__this.events[param].emit("change", ({param, value}))
-                                this.__this.emit("change", ({param, value}))
                             }
+                            this.__this.emit("change", ({param, value}))
                         }
                     } else {
                         this["_" + param] = value
                         if (this.__this.events.hasOwnProperty(param)) {
                             this.__this.events[param].emit("change", ({param, value}))
-                            this.__this.emit("change", ({param, value}))
                         }
+                        this.__this.emit("change", ({param, value}))
                     }
                 },
                 get(): any {

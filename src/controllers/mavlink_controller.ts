@@ -64,34 +64,41 @@ export default class MavlinkController {
         }
 
         this.mavlink_protocol = new MavLinkProtocolV2(this.SYS_ID, this.COMP_ID)
-        //this.ftp = new MavFTP(<Writable>this.port, {protocol: this.mavlink_protocol});
+        this.ftp = new MavFTP(<Writable>this.port, {protocol: this.mavlink_protocol})
         this.heartbeat = new Heartbeat(<Writable>this.port, {protocol: this.mavlink_protocol})
         this.heartbeat.type = MavType.GROUND_ROVER
         this.heartbeat.autopilot = MavAutopilot.GENERIC
         this.heartbeat.baseMode = MavModeFlag.MANUAL_INPUT_ENABLED
         this.heartbeat.systemStatus = this.main.data_controller.params.system_state
 
-        this.port
-            .pipe(new MavLinkPacketSplitter())
-            .pipe(new MavLinkPacketParser())
-            .pipe(this.heartbeat)
-            //.pipe(this.ftp)
-            .resume()
-            .on('data', async (packet: MavLinkPacket) => {
-                const clazz: MavLinkDataConstructor<MavLinkData> = this.REGISTRY[packet.header.msgid]
-                const packet_data = packet.protocol.data(packet.payload, clazz)
-                if (clazz) {
-                    if (packet_data.hasOwnProperty("targetSystem") && packet_data["targetSystem"] == this.SYS_ID
-                        && packet_data.hasOwnProperty("targetComponent") && packet_data["targetComponent"] == this.COMP_ID) {
-                        await this.handle_packet(packet_data)
-                    } else {
-                        await this.handle_packet(packet_data)
+        try {
+            this.port
+                .pipe(new MavLinkPacketSplitter())
+                .pipe(new MavLinkPacketParser())
+                .pipe(this.heartbeat)
+                .pipe(this.ftp)
+                .on('data', async (packet: MavLinkPacket) => {
+                    try {
+                        const clazz: MavLinkDataConstructor<MavLinkData> = this.REGISTRY[packet.header.msgid]
+                        if (clazz) {
+                            const packet_data = packet.protocol.data(packet.payload, clazz)
+                            if (packet_data.hasOwnProperty("targetSystem") && packet_data["targetSystem"] == this.SYS_ID
+                                && packet_data.hasOwnProperty("targetComponent") && packet_data["targetComponent"] == this.COMP_ID) {
+                                await this.handle_packet(packet_data)
+                            } else {
+                                await this.handle_packet(packet_data)
+                            }
+                        }
+                    } catch (e) {
+                        await this.main.logs_controller.error("Error with data parsing:", e)
                     }
-                }
-            })
-            .on("error", (err) => {
-                this.main.logs_controller.error("Port Error:", err)
-            })
+                })
+                .on("error", (err) => {
+                    this.main.logs_controller.error("Pipeline Error:", err)
+                })
+        } catch (e) {
+            console.error(e)
+        }
 
         if (this.port instanceof SerialPort) {
             this.port.on('open', () => {
@@ -102,12 +109,13 @@ export default class MavlinkController {
                 this.on_port_ready()
             })
         }
+
+        await this.main.logs_controller.info("Mavlink controller initialized!")
     }
 
     async on_port_ready() {
         this.heartbeat.start()
         this.port_ready = true
-        await this.main.logs_controller.info("Mavlink controller initialized!")
 
         this.createMsgInterval(common.BatteryStatus.MSG_ID, 500)
         this.createMsgInterval(lfs.VehicleData.MSG_ID, 100)
@@ -115,6 +123,7 @@ export default class MavlinkController {
         this.createMsgInterval(lfs.BrakeData.MSG_ID, 100)
         this.createMsgInterval(common.GpsRawInt.MSG_ID, 500)
         this.createMsgInterval(common.RawImu.MSG_ID, 100)
+        this.createMsgInterval(lfs.ComputerStatus.MSG_ID, 1000)
     }
 
     async send(msg: MavLinkData | MavLinkData[], wait_time: number = 10): Promise<boolean> {
@@ -141,7 +150,7 @@ export default class MavlinkController {
             }
             return true
         }
-
+        return false
     }
 
     async handle_packet(data: MavLinkData) {
@@ -154,14 +163,20 @@ export default class MavlinkController {
         } else if (data instanceof common.ParamRequestRead) {
             await this.send(this.create_param_msg(data.paramId, data.paramIndex))
         } else if (data instanceof common.LogRequestList) {
-            if (!this.main.in_production) {
-                await sleep(300)
-            }
             await this.main.logs_controller.onLogListRequest(data.start, data.end)
         } else if (data instanceof common.CommandLong && data.command == common.MavCmd.SET_MESSAGE_INTERVAL) {
             this.createMsgInterval(data._param1, data._param2)
+        } else if (data instanceof common.RadioStatus) {
+            this.main.data_controller.params.radio_rssi = data.rssi
+            this.main.data_controller.params.radio_remrssi = data.remrssi
+            this.main.data_controller.params.radio_txbuf = data.txbuf
+            this.main.data_controller.params.radio_noise = data.noise
+            this.main.data_controller.params.radio_remnoise = data.remnoise
+            this.main.data_controller.params.radio_rxerrors = data.rxerrors
+            this.main.data_controller.params.radio_fixed = data.fixed
+            await this.send(data)
         } else {
-            console.log('Received packet:', data)
+            await this.main.logs_controller.warning('Received packet:' + data.toString())
         }
     }
 
@@ -243,14 +258,14 @@ export default class MavlinkController {
                 }
                 case lfs.ThrottleData.MSG_ID: {
                     const throttle_msg = new lfs.ThrottleData()
-                    throttle_msg.raw = this.main.data_controller.params.throttle_raw_val
+                    throttle_msg.raw = this.main.data_controller.params.throttle_raw
                     throttle_msg.input = this.main.data_controller.params.throttle_input
                     throttle_msg.output = this.main.data_controller.params.throttle_output
                     return throttle_msg
                 }
                 case lfs.BrakeData.MSG_ID: {
                     const brake_msg = new lfs.BrakeData()
-                    brake_msg.raw = this.main.data_controller.params.brake_raw_val
+                    brake_msg.raw = this.main.data_controller.params.brake_raw
                     brake_msg.input = this.main.data_controller.params.brake_input
                     brake_msg.output = this.main.data_controller.params.brake_output
                     return brake_msg
@@ -271,6 +286,7 @@ export default class MavlinkController {
                     msg.xgyro = this.main.data_controller.params.gyro_lat * 1000
                     msg.ygyro = this.main.data_controller.params.gyro_lon * 1000
                     msg.zgyro = this.main.data_controller.params.gyro_z * 1000
+                    msg.temperature = this.main.data_controller.params.imu_temp * 100
                     return msg
                 }
                 case common.ScaledImu.MSG_ID: {
@@ -281,6 +297,21 @@ export default class MavlinkController {
                     msg.xgyro = this.main.data_controller.params.gyro_lat * 1000
                     msg.ygyro = this.main.data_controller.params.gyro_lon * 1000
                     msg.zgyro = this.main.data_controller.params.gyro_z * 1000
+                    return msg
+                }
+                case lfs.ComputerStatus.MSG_ID: {
+                    const msg = new lfs.ComputerStatus()
+                    msg.uptime = this.main.uptime
+                    msg.cpuCore = this.main.data_controller.params.cpu_cores
+                    msg.temperatureCore = this.main.data_controller.params.cpu_temp * 100
+                    msg.temperatureBoard = this.main.data_controller.params.board_temp
+                    msg.gpuCore = this.main.data_controller.params.gpu_cores
+                    msg.type = this.main.data_controller.params.computer_type
+                    msg.ramUsage = this.main.data_controller.params.ram_usage
+                    msg.ramTotal = this.main.data_controller.params.ram_total
+                    msg.storageType = this.main.data_controller.params.storage_type
+                    msg.storageUsage = this.main.data_controller.params.storage_usage
+                    msg.storageTotal = this.main.data_controller.params.storage_total
                     return msg
                 }
                 default: {

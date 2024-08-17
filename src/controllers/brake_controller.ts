@@ -1,5 +1,6 @@
 import DS3502 from "../../libs/DS3502/DS3502.js";
 import Main from "../../main.js";
+import {MavState} from "mavlink-mappings/dist/lib/minimal.js";
 
 export default class BrakeController {
 
@@ -14,7 +15,7 @@ export default class BrakeController {
     }
 
     async init() {
-        if (this.main.in_production) {
+        if (this.device) {
             await this.device.setDefault(0);
         }
 
@@ -23,7 +24,7 @@ export default class BrakeController {
         })
 
         this.main.data_controller.addParamListener("brake_output", ({value}) => {
-            this.main.digital_outputs_controller.setBrakeLightOutput(value > this.main.data_controller.params.brake_light_act)
+            this.main.digital_outputs_controller.setBrakeLightOutput(value > this.main.data_controller.params.brake_light_act && this.main.data_controller.params.system_state == MavState.ACTIVE)
         })
     }
 }

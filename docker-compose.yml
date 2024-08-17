@@ -11,16 +11,21 @@ services:
         volumes:
             - ./data/influxdb-data:/var/lib/influxdb2
             - ./data/influxdb-config:/etc/influxdb2
+        healthcheck:
+            test: [ "CMD", "influx", "ping" ]
+            timeout: 5s
+            interval: 5s
+            retries: 100
 
     lfs_vcu:
         container_name: lfs-vcu
         build: .
         command: "npm run prod"
-        #entrypoint: /bin/sh
         env_file: ./.env
         privileged: true
         depends_on:
-            - database
+            database:
+                condition: service_healthy
         networks:
             - lfs-network
         ports:

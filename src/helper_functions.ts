@@ -16,6 +16,10 @@ export function genRandomHash(length: number){
         .join("")
 }
 
+export function times(val, count: number):(typeof val)[] {
+    return new Array(count).fill(val)
+}
+
 export function sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -23,4 +27,31 @@ export function sleep(ms: number) {
 export function map_range(value, low1, high1, low2, high2) {
    const v = low2 + (high2 - low2) * (value - low1) / (high1 - low1);
    return isNaN(v)? 0 : v
+}
+
+export function range(start, stop?: number, step: number = 1) {
+    if (typeof stop == 'undefined') {
+        stop = start;
+        start = 0;
+    }
+
+    if ((step > 0 && start >= stop) || (step < 0 && start <= stop)) {
+        return [];
+    }
+
+    let result = [];
+    for (let i = start; step > 0 ? i < stop : i > stop; i += step) {
+        result.push(i);
+    }
+
+    return result;
+}
+
+export function toArrayBuffer(buffer: Buffer): ArrayBuffer {
+    const arrayBuffer = new ArrayBuffer(buffer.length);
+    const view = new Uint8Array(arrayBuffer);
+    for (let i = 0; i < buffer.length; ++i) {
+        view[i] = buffer[i];
+    }
+    return arrayBuffer;
 }

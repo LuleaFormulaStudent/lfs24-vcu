@@ -6,7 +6,7 @@ async function generateFile(filename: string, moduleName: string) {
     const lines: string[] = [
         "import {MavLinkData} from \"mavlink-mappings\"\n" +
         "import {MavLinkPacketField} from \"mavlink-mappings/dist/lib/mavlink.js\"\n" +
-        "import {uint8_t, float, MavLinkPacketRegistry} from \"node-mavlink\""
+        "import {uint8_t, uint16_t, uint32_t, uint64_t, float, MavLinkPacketRegistry} from \"node-mavlink\""
     ]
     const source = fs.readFileSync(filename, {encoding: "utf-8"})
     const output = {write: msg => lines.push(msg ?? '')} as Writer

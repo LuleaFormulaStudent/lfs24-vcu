@@ -1,5 +1,6 @@
 import DS3502 from "../../libs/DS3502/DS3502.js";
 import Main from "../../main.js";
+import {MavState} from "mavlink-mappings/dist/lib/minimal.js";
 
 export default class ThrottleController {
 
@@ -19,13 +20,13 @@ export default class ThrottleController {
         })
 
         this.main.data_controller.addParamListener("throttle_output", ({value}) => {
-            if (value > this.main.data_controller.params.foot_switch_act) {
+            if (value > this.main.data_controller.params.foot_switch_act && this.main.data_controller.params.system_state == MavState.ACTIVE) {
                 this.main.digital_outputs_controller.setFootSwitch(true)
             } else {
                 this.main.digital_outputs_controller.setFootSwitch(false)
             }
 
-            if (this.main.in_production && this.main.data_controller.params.throttle_enable) {
+            if (this.device && this.main.data_controller.params.system_state == MavState.ACTIVE) {
                 this.device.write(value)
             }
         })
