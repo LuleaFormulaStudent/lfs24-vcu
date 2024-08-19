@@ -10,8 +10,7 @@ import {DrivingMode} from "mavlink-lib/dist/lfs.js";
 import {GpsFixType} from "mavlink-mappings/dist/lib/common.js";
 import LSM6DS032 from "../../libs/LSM6DS032/LSM6DS032.js";
 import SystemInfo, {SystemInfoData} from "../../libs/system_info/system_info.js";
-import GPSDriver from "../../libs/gps/gps_driver";
-import GPS, {GGAQuality} from "gps";
+import GPSDriver, {GGAQuality} from "../../libs/gps/gps_driver.js";
 
 export const INT16_MAX = 2 ** 15 - 1
 export const INT32_MAX = 2 ** 31 - 1
@@ -382,36 +381,36 @@ export default class DataController extends ParamsHandler {
                     this.params.gps_vdop = data.vdop
                 }
                 if (data.hasOwnProperty("quality")) {
-                    switch ((data.quality as GGAQuality)) {
-                        case GPS.GGAQuality["dgps-fix"]: {
+                    switch (data.quality as GGAQuality) {
+                        case GGAQuality["dgps-fix"]: {
                             this.params.gps_mode = GpsFixType.DGPS
                             break;
                         }
-                        case GPS.GGAQuality["fix"]: {
+                        case GGAQuality["fix"]: {
                             this.params.gps_mode = GpsFixType.GPS_FIX_TYPE_2D_FIX
                             break;
                         }
-                        case GPS.GGAQuality["pps-fix"]: {
+                        case GGAQuality["pps-fix"]: {
                             this.params.gps_mode = GpsFixType.PPP
                             break;
                         }
-                        case GPS.GGAQuality["rtk"]: {
+                        case GGAQuality["rtk"]: {
                             this.params.gps_mode = GpsFixType.RTK_FIXED
                             break;
                         }
-                        case GPS.GGAQuality["rtk-float"]: {
+                        case GGAQuality["rtk-float"]: {
                             this.params.gps_mode = GpsFixType.RTK_FLOAT
                             break;
                         }
-                        case GPS.GGAQuality["estimated"]: {
+                        case GGAQuality["estimated"]: {
                             this.params.gps_mode = GpsFixType.STATIC
                             break;
                         }
-                        case GPS.GGAQuality["manual"]: {
+                        case GGAQuality["manual"]: {
                             this.params.gps_mode = GpsFixType.STATIC
                             break;
                         }
-                        case GPS.GGAQuality["simulated"]: {
+                        case GGAQuality["simulated"]: {
                             this.params.gps_mode = GpsFixType.STATIC
                             break;
                         }
@@ -467,7 +466,7 @@ export default class DataController extends ParamsHandler {
         }
 
         if (this.params.imu_lon_speed > 1) {
-            speeds.push(this.params.imu_lon_speed)
+            //speeds.push(this.params.imu_lon_speed)
         }
 
         let vehicle_speed = 0
@@ -475,7 +474,7 @@ export default class DataController extends ParamsHandler {
             vehicle_speed += speeds[i]
         }
 
-        console.log(this.params.fl_wheel_speed, this.params.fr_wheel_speed, this.params.rear_axle_speed, this.params.gps_speed, this.params.imu_lon_speed)
+        //console.log(this.params.fl_wheel_speed, this.params.fr_wheel_speed, this.params.rear_axle_speed, this.params.gps_speed, this.params.imu_lon_speed)
         this.params.vehicle_speed = Math.round(vehicle_speed * 3.6 / speeds.length)
     }
 }

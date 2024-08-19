@@ -6,7 +6,7 @@ export default class RelayBoard {
 
     private output_1: Gpio
     private output_2: Gpio
-    private output_3: Gpio
+    private output_3: Gpio | null = null
     private output_4: Gpio
     private output_5: Gpio
     private output_6: Gpio
@@ -16,7 +16,7 @@ export default class RelayBoard {
     constructor() {
         this.output_1 = new Gpio(535, 'out');
         this.output_2 = new Gpio(536, 'out');
-        this.output_3 = new Gpio(519, 'out'); // Does not Work!!
+        //this.output_3 = new Gpio(519, 'out'); // Does not Work!!
         this.output_4 = new Gpio(528, 'out'); // Reverse Direction
         this.output_5 = new Gpio(532, 'out'); // Foot Switch
         this.output_6 = new Gpio(529, 'out'); // Forward direction

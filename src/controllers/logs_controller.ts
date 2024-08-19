@@ -3,7 +3,7 @@ import {common} from "node-mavlink";
 import {sleep} from "../helper_functions.js";
 import fs from "fs";
 import path from "path";
-import {MavSeverity} from "mavlink-mappings/dist/lib/common";
+import {MavSeverity} from "mavlink-mappings/dist/lib/common.js";
 
 export default class LogsController {
 

@@ -1,7 +1,7 @@
 import DS3502 from "../../libs/DS3502/DS3502.js";
 import Main from "../../main.js";
 import {MavState} from "mavlink-mappings/dist/lib/minimal.js";
-import {map_range} from "../helper_functions";
+import {map_range} from "../helper_functions.js";
 
 export default class BrakeController {
 

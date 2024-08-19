@@ -3,6 +3,17 @@ import {ReadlineParser} from "@serialport/parser-readline"
 import EventEmitter from "node:events";
 import GPS from "gps";
 
+export enum GGAQuality {
+    'fix'       = 1,
+    'dgps-fix'  = 2,
+    'pps-fix'   = 3,
+    'rtk'       = 4,
+    'rtk-float' = 5,
+    'estimated' = 6,
+    'manual'    = 7,
+    'simulated' = 8
+}
+
 export default class GPSDriver extends EventEmitter {
     port: SerialPort
     gps: GPS
@@ -25,9 +36,9 @@ export default class GPSDriver extends EventEmitter {
 
         this.gps = new GPS()
         this.port = new SerialPort({path: "/dev/ttyAMA5", baudRate: 9600});
-        this.port
-            .pipe(new ReadlineParser({delimiter: '\r\n'}))
-            .on('data', data => this.gps.updatePartial(data))
+        const pipe = this.port.pipe(new ReadlineParser({delimiter: '\r\n'}))
+
+        pipe.on('data', data => this.gps.update(data))
 
         this.gps.on("data", data => {
             if (data.hasOwnProperty("lat") && data.hasOwnProperty("lon")) {

@@ -55,6 +55,12 @@ export default class SteeringWheelController {
                     } else if (event == "btn_r" && val == 2) {
                         clearTimeout(this.activate_ts_timeout)
                     }
+                    if (event == "cp") {
+                        this.main.digital_outputs_controller.setCoolantPumpOutput(val == 1)
+                    }
+                    if (event == "cp_s") {
+                        this.main.data_controller.params.cool_pump_start = val == 1
+                    }
                 } catch (e) {
                     console.log(line)
                 }
