@@ -23,6 +23,7 @@ services:
         command: "npm run prod"
         env_file: ./.env
         privileged: true
+        restart: always
         depends_on:
             database:
                 condition: service_healthy

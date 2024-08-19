@@ -1,73 +1,44 @@
 import {SerialPort} from "serialport"
 import {ReadlineParser} from "@serialport/parser-readline"
-import Parser from "@signalk/nmea0183-signalk"
 import EventEmitter from "node:events";
-import {common} from "node-mavlink";
+import GPS from "gps";
 
 export default class GPSDriver extends EventEmitter {
     port: SerialPort
-    readLineParser: any
-    gps_parser: any
+    gps: GPS
+
+    private prev_lat = 0
+    private prev_lon = 0
+    private current_lat = 0
+    private current_lon = 0
+
+    get heading(): number {
+        if (this.prev_lat != 0 && this.prev_lon != 0) {
+            return GPS.Heading(this.prev_lat, this.prev_lon, this.current_lat, this.current_lon)
+        } else {
+            return 0
+        }
+    }
 
     constructor() {
         super();
+
+        this.gps = new GPS()
         this.port = new SerialPort({path: "/dev/ttyAMA5", baudRate: 9600});
-        this.readLineParser = this.port.pipe(new ReadlineParser({delimiter: '\r\n'}))
-        this.gps_parser = new Parser()
+        this.port
+            .pipe(new ReadlineParser({delimiter: '\r\n'}))
+            .on('data', data => this.gps.updatePartial(data))
 
-        this.port.open(() => {
-            this.readLineParser.on("data", line => {
-                try {
-                    const packet = this.gps_parser.parse(line)
-                    if (packet !== null) {
-                        const speed_packet = packet["updates"][0]["values"].find((v) => v.path == "navigation.speedOverGround")
-                        if (speed_packet != null) {
-                            this.emit("data", {gps_speed: speed_packet.value >= 1 ? speed_packet.value : 0})
-                        }
-                        const navigation_packet = packet["updates"][0]["values"].find((v) => v.path == "navigation.position")
-                        if (navigation_packet != null) {
-                            this.emit("data", {
-                                gps_longitude: navigation_packet.value.longitude,
-                                gps_latitude: navigation_packet.value.latitude
-                            })
-                        }
-                        const satellites_packet = packet["updates"][0]["values"].find((v) => v.path == "navigation.gnss.satellitesInView")
-                        if (satellites_packet != null) {
-                            this.emit("data", {
-                                gps_num_sats: satellites_packet.value.count
-                            })
-                        }
-
-                        const altitude_packet = packet["updates"][0]["values"].find((v) => v.path == "navigation.gnss.antennaAltitude")
-                        if (altitude_packet != null) {
-                            this.emit("data", {
-                                gps_altitude: altitude_packet.value
-                            })
-                        }
-
-                        const gps_mode_packet = packet["updates"][0]["values"].find((v) => v.path == "navigation.gnss.methodQuality")
-                        if (gps_mode_packet != null) {
-                            switch (gps_mode_packet.value.toString().toLowerCase()) {
-                                case "gnss fix": this.emit("data", {gps_mode: common.GpsFixType.GPS_FIX_TYPE_3D_FIX}); break
-                                case "estimated (dr) mode": this.emit("data", {gps_mode: common.GpsFixType.DGPS}); break
-                                default: this.emit("data", {gps_mode: common.GpsFixType.NO_FIX})
-                            }
-                            this.emit("data", {
-                                gps_mode: (gps_mode_packet.value.toString().toLowerCase() == "gnss fix"? common.GpsFixType.GPS_FIX_TYPE_3D_FIX : common.GpsFixType.NO_FIX)
-                            })
-                        }
-
-                        const horizontal_dilution_packet = packet["updates"][0]["values"].find((v) => v.path == "navigation.gnss.horizontalDilution")
-                        if (horizontal_dilution_packet != null) {
-                            this.emit("data", {
-                                gps_horiz_dil: horizontal_dilution_packet.value
-                            })
-                        }
-                    }
-                } catch (error) {
-                    console.error("Got bad packet!");
-                }
-            })
+        this.gps.on("data", data => {
+            if (data.hasOwnProperty("lat") && data.hasOwnProperty("lon")) {
+                this.prev_lat = this.current_lat
+                this.prev_lon = this.current_lon
+                this.current_lat = data.lat
+                this.current_lon = data.lon
+            }
+            this.emit("data", data)
         })
+        this.gps.on("error", err => this.emit("error", err))
+        this.port.open(() => this.emit("open"))
     }
 }

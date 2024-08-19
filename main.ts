@@ -11,7 +11,8 @@ import LogsController from "./src/controllers/logs_controller.js";
 import package_info from "./package.json" assert {type: "json"};
 import {configDotenv} from "dotenv";
 import HILController from "./src/controllers/hil_controller.js";
-import {DrivingMode} from "./mavlink/lfs.js";
+import {DrivingMode} from "mavlink-lib/dist/lfs.js";
+import {waitFor} from "node-mavlink";
 
 configDotenv()
 
@@ -29,29 +30,15 @@ export default class Main {
 
     tcp_server: Server
     tcp_server_connections: Socket[] = []
+    tcp_server_stared = false
 
-    in_production: boolean = true
+    in_production: boolean = process.env.NODE_ENV == 'production'
     start_time: number = Date.now()
     version: string = package_info.version
 
-    async init() {
+    constructor() {
         this.logs_controller = new LogsController(this)
-        await this.logs_controller.info("Starting initialization of system..")
-        await this.logs_controller.info("Version: " + this.version)
-
-
-        if (process.env.NODE_ENV == 'production') {
-            this.in_production = true
-            await this.logs_controller.info("System is in production mode.")
-        } else {
-            await this.logs_controller.info("System is in development mode.")
-        }
-
-        await this.logs_controller.info("Starting initializing constructors..")
         this.data_controller = new DataController(this)
-        await this.setSystemState(MavState.BOOT)
-        this.setSystemMode(MavModeFlag.HIL_ENABLED, false)
-
         this.status_led = new StatusLed(this)
         this.throttle_controller = new ThrottleController(this)
         this.digital_outputs_controller = new DigitalOutputsController(this)
@@ -59,47 +46,63 @@ export default class Main {
         this.steering_wheel_controller = new SteeringWheelController(this)
         this.mavlink_controller = new MavlinkController(this)
         this.hil_controller = new HILController(this)
-        await this.logs_controller.info("Initializing constructors done!")
+        this.tcp_server = createServer()
+    }
+
+    async init() {
+        await this.logs_controller.init()
+        await this.logs_controller.info("Starting initialization of system..")
+        await this.logs_controller.info("Version: " + this.version)
+
+        if (this.in_production) {
+            await this.logs_controller.info("System is in production mode.")
+        } else {
+            await this.logs_controller.info("System is in development mode.")
+        }
+
+        await this.setSystemState(MavState.BOOT)
+        this.setSystemMode(MavModeFlag.HIL_ENABLED, false)
 
         await this.logs_controller.info("Initializing TCP server..")
-        this.tcp_server = createServer()
-
         this.tcp_server.on('error', (err) => {
             this.logs_controller.error("TCP Server error:", err)
         });
 
-        this.tcp_server.on('connection', async (socket) => {
-            this.tcp_server_connections.push(socket);
-            await this.logs_controller.info("New connection to client.")
+        if (!this.in_production) {
+            this.tcp_server.on('connection', async (socket) => {
+                this.tcp_server_connections.push(socket);
+                socket.on("error", (err) => {
+                    this.logs_controller.error("Error on client socket", err)
+                })
 
-            socket.on("error", (err) => {
-                this.logs_controller.error("Error on client socket", err)
-            })
+                socket.on("data", (data) => {
+                    this.tcp_server_connections.forEach((connection) => {
+                        if (connection !== socket) {
+                            connection.write(data);
+                        }
+                    });
+                })
 
-            socket.on("data", (data) => {
-                this.tcp_server_connections.forEach((connection) => {
-                    if (connection !== socket) {
-                        connection.write(data);
-                    }
+                socket.on('close', () => {
+                    this.tcp_server_connections.splice(this.tcp_server_connections.indexOf(socket), 1);
                 });
-            })
-
-            socket.on('close', () => {
-                this.tcp_server_connections.splice(this.tcp_server_connections.indexOf(socket), 1);
             });
-        });
 
-        this.tcp_server.listen({port: 5432, host: "0.0.0.0"}, () => {
-            this.logs_controller.info("TCP Server started!")
-        });
+            this.tcp_server.listen({port: 5432, host: "0.0.0.0"}, () => {
+                this.logs_controller.info("TCP Server started!")
+                this.tcp_server_stared = true
+            });
+
+            await waitFor(() => this.tcp_server_stared, 1000)
+        }
 
         await this.data_controller.init()
         await this.digital_outputs_controller.init()
         await this.throttle_controller.init()
         await this.brake_controller.init()
         await this.steering_wheel_controller.init()
-        await this.mavlink_controller.init()
         await this.hil_controller.init()
+        await this.mavlink_controller.init()
 
         await this.logs_controller.info("Done initializing system!")
         await this.setSystemState(MavState.STANDBY)
@@ -107,11 +110,11 @@ export default class Main {
 
     async setSystemState(state: MavState) {
         this.data_controller.params.system_state = state
-        await this.logs_controller.info("Setting system in " + MavState[state].toLowerCase())
+        await this.logs_controller.info("Setting system in " + MavState[state].toLowerCase() + " state.")
     }
 
     get uptime(): number {
-        return this.start_time - Date.now()
+        return Date.now() - this.start_time
     }
 
     setSystemMode(mode: MavModeFlag, active: boolean) {
@@ -124,6 +127,54 @@ export default class Main {
 
     isInSystemMode(mode: MavModeFlag): boolean {
         return (this.data_controller.params.system_state & mode) != 0
+    }
+
+    async activateTS(): Promise<boolean> {
+        try {
+            if (this.isInSystemMode(MavModeFlag.HIL_ENABLED)) {
+                await this.logs_controller.warning("Cannot activate traction system when in HIL mode!")
+            }
+
+            if (this.data_controller.params.system_state != MavState.STANDBY) {
+                await this.logs_controller.info("System is not in standby mode")
+                return false
+            }
+
+            await this.logs_controller.info("Trying to activate traction system..")
+            this.digital_outputs_controller.setTSActiveRelay(true)
+
+            await waitFor(() => this.data_controller.params.system_state == MavState.ACTIVE, 5000, 100)
+            return true
+        } catch (e) {
+            if (e == "Timeout") {
+                this.digital_outputs_controller.setTSActiveRelay(false)
+                await this.logs_controller.error("Traction system did not activate in time!")
+            } else {
+                await this.logs_controller.error("Error occurred ")
+            }
+            return false
+        }
+    }
+
+    async deactivateTS(): Promise<boolean> {
+        try {
+            await this.logs_controller.info("Trying to activate TS")
+            this.digital_outputs_controller.setTSActiveRelay(false)
+            await waitFor(() => this.data_controller.params.system_state == MavState.STANDBY, 3000, 100)
+            return true
+        } catch (e) {
+            if (e == "Timeout") {
+                await this.logs_controller.error("Traction system did not deactivate in time!")
+            } else {
+                await this.logs_controller.error("Error occurred ")
+            }
+            return false
+        }
+    }
+
+    async onUnexpectedTSShutdown() {
+        this.setDrivingMode(DrivingMode.NEUTRAL)
+        await this.logs_controller.error("Traction system turned off, probably an error occurred!")
     }
 
     setDrivingMode(mode: DrivingMode) {

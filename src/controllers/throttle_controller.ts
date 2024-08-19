@@ -1,22 +1,22 @@
 import DS3502 from "../../libs/DS3502/DS3502.js";
 import Main from "../../main.js";
 import {MavState} from "mavlink-mappings/dist/lib/minimal.js";
+import {map_range} from "../helper_functions.js";
 
 export default class ThrottleController {
 
-    private device: DS3502
+    private readonly device: DS3502 | null = null
 
     constructor(private main: Main) {
         if (this.main.in_production) {
             this.device = new DS3502(0x28)
-            this.device.on("error", (err) => this.main.logs_controller.error("Error with i2c Device:", err))
+            this.device.on("error", (err) => this.main.logs_controller.error("Error with DS3502:", err))
         }
-        this.main.logs_controller.debug("Throttle controller constructor initialized!")
     }
 
     async init() {
         this.main.data_controller.addParamListener("throttle_input", ({value}) => {
-            this.main.data_controller.params.throttle_output = value * this.main.data_controller.params.throttle_max_val
+            this.main.data_controller.params.throttle_output = map_range(Math.max(value, this.main.data_controller.params.throttle_dz), this.main.data_controller.params.throttle_dz, 1, 0, this.main.data_controller.params.throttle_max_val)
         })
 
         this.main.data_controller.addParamListener("throttle_output", ({value}) => {
@@ -30,5 +30,7 @@ export default class ThrottleController {
                 this.device.write(value)
             }
         })
+
+        await this.main.logs_controller.debug("Throttle controller initialized!")
     }
 }

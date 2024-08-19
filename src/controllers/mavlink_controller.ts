@@ -26,21 +26,21 @@ import {
     MavParamType
 } from "mavlink-mappings/dist/lib/common.js";
 import {sleep} from "../helper_functions.js";
-import * as lfs from "../../mavlink/lfs.js";
+import {BrakeData, ComputerStatus, REGISTRY, ThrottleData, VehicleData} from "mavlink-lib/dist/lfs.js"
 
 export default class MavlinkController {
 
     SYS_ID = 1
     COMP_ID = 1
-    port: SerialPort | Socket
+    port: SerialPort | Socket | null = null
 
-    heartbeat: Heartbeat
-    ftp: MavFTP
+    heartbeat: Heartbeat | null = null
+    ftp: MavFTP | null = null
     mavlink_protocol: MavLinkProtocolV2
     REGISTRY: MavLinkPacketRegistry = {
         ...minimal.REGISTRY,
         ...common.REGISTRY,
-        ...lfs.REGISTRY
+        ...REGISTRY
     }
 
     port_ready = false
@@ -49,23 +49,25 @@ export default class MavlinkController {
     mav_messages_intervals: { [propName: number]: any } = {}
 
     constructor(private main: Main) {
-        for (const message of Object.values(lfs.REGISTRY)) {
+        for (const message of Object.values(REGISTRY)) {
             registerCustomMessageMagicNumber((message as MavLinkDataConstructor<MavLinkData>).MSG_ID.toString(),
                 (message as MavLinkDataConstructor<MavLinkData>).MAGIC_NUMBER)
         }
-        this.main.logs_controller.debug("Mavlink controller constructor initialized!")
+        this.mavlink_protocol = new MavLinkProtocolV2(this.SYS_ID, this.COMP_ID)
     }
 
     async init() {
+        await this.main.logs_controller.debug("Mavlink controller starting initializing!")
+
         if (this.main.in_production) {
             this.port = new SerialPort({path: "/dev/ttyAMA2", baudRate: 57600});
         } else {
             this.port = connect({host: '0.0.0.0', port: 5432})
         }
 
-        this.mavlink_protocol = new MavLinkProtocolV2(this.SYS_ID, this.COMP_ID)
         this.ftp = new MavFTP(<Writable>this.port, {protocol: this.mavlink_protocol})
         this.heartbeat = new Heartbeat(<Writable>this.port, {protocol: this.mavlink_protocol})
+
         this.heartbeat.type = MavType.GROUND_ROVER
         this.heartbeat.autopilot = MavAutopilot.GENERIC
         this.heartbeat.baseMode = MavModeFlag.MANUAL_INPUT_ENABLED
@@ -82,8 +84,8 @@ export default class MavlinkController {
                         const clazz: MavLinkDataConstructor<MavLinkData> = this.REGISTRY[packet.header.msgid]
                         if (clazz) {
                             const packet_data = packet.protocol.data(packet.payload, clazz)
-                            if (packet_data.hasOwnProperty("targetSystem") && packet_data["targetSystem"] == this.SYS_ID
-                                && packet_data.hasOwnProperty("targetComponent") && packet_data["targetComponent"] == this.COMP_ID) {
+                            //@ts-ignore
+                            if (packet_data.hasOwnProperty("targetSystem") && packet_data["targetSystem"]! == this.SYS_ID && packet_data.hasOwnProperty("targetComponent") && packet_data["targetComponent"] == this.COMP_ID) {
                                 await this.handle_packet(packet_data)
                             } else {
                                 await this.handle_packet(packet_data)
@@ -104,26 +106,26 @@ export default class MavlinkController {
             this.port.on('open', () => {
                 this.on_port_ready()
             })
-        } else if (this.port instanceof Socket) {
+        } else {
             this.port.on('connect', () => {
                 this.on_port_ready()
             })
         }
 
-        await this.main.logs_controller.info("Mavlink controller initialized!")
+        await this.main.logs_controller.debug("Mavlink controller initialized!")
     }
 
     async on_port_ready() {
-        this.heartbeat.start()
+        this.heartbeat!.start()
         this.port_ready = true
 
         this.createMsgInterval(common.BatteryStatus.MSG_ID, 500)
-        this.createMsgInterval(lfs.VehicleData.MSG_ID, 100)
-        this.createMsgInterval(lfs.ThrottleData.MSG_ID, 100)
-        this.createMsgInterval(lfs.BrakeData.MSG_ID, 100)
+        this.createMsgInterval(VehicleData.MSG_ID, 100)
+        this.createMsgInterval(ThrottleData.MSG_ID, 100)
+        this.createMsgInterval(BrakeData.MSG_ID, 100)
         this.createMsgInterval(common.GpsRawInt.MSG_ID, 500)
         this.createMsgInterval(common.RawImu.MSG_ID, 100)
-        this.createMsgInterval(lfs.ComputerStatus.MSG_ID, 1000)
+        this.createMsgInterval(ComputerStatus.MSG_ID, 1000)
     }
 
     async send(msg: MavLinkData | MavLinkData[], wait_time: number = 10): Promise<boolean> {
@@ -133,7 +135,7 @@ export default class MavlinkController {
                     await send(<Writable>this.port, msg, this.mavlink_protocol)
                     return true
                 } catch (e) {
-                    await this.main.logs_controller.error("Error when sending msg:", e)
+                    await this.main.logs_controller.error("Error when sending msg (" + msg.constructor.name + "): ", e)
                     return false
                 }
             } else {
@@ -143,7 +145,7 @@ export default class MavlinkController {
                         await this.send(m)
                         await sleep(wait_time)
                     } catch (e) {
-                        await this.main.logs_controller.error("Error when sending msg:", e)
+                        await this.main.logs_controller.error("Error when sending msg (" + msg.constructor.name + "): ", e)
                         return false
                     }
                 }
@@ -162,6 +164,13 @@ export default class MavlinkController {
             }
         } else if (data instanceof common.ParamRequestRead) {
             await this.send(this.create_param_msg(data.paramId, data.paramIndex))
+        } else if (data instanceof common.ParamSet) {
+            try {
+                this.main.data_controller.params[data.paramId] = data.paramValue
+                await this.send(this.create_param_msg(data.paramId, 0))
+            } catch (e: any) {
+                await this.main.logs_controller.error("Error setting parameter: " + data.paramId + " = " + data.paramValue + ". " + e.toString())
+            }
         } else if (data instanceof common.LogRequestList) {
             await this.main.logs_controller.onLogListRequest(data.start, data.end)
         } else if (data instanceof common.CommandLong && data.command == common.MavCmd.SET_MESSAGE_INTERVAL) {
@@ -180,7 +189,7 @@ export default class MavlinkController {
         }
     }
 
-    private create_param_msg(param_key, index = 1, count = 1): common.ParamValue {
+    private create_param_msg(param_key: string, index = 1, count = 1): common.ParamValue {
         const msg = new common.ParamValue()
         msg.paramId = param_key
         msg.paramCount = count
@@ -203,7 +212,7 @@ export default class MavlinkController {
         return msg
     }
 
-    createMsgInterval(msg_id, interval) {
+    createMsgInterval(msg_id: number, interval: number) {
         this.mav_messages_intervals[msg_id] = setInterval(async () => {
             const msg = this.createFromMsgID(msg_id)
             if (msg) {
@@ -250,28 +259,28 @@ export default class MavlinkController {
                 case common.GpsRawInt.MSG_ID: {
                     const gps_msg = new common.GpsRawInt()
                     gps_msg.alt = this.main.data_controller.params.gps_altitude * 1000
-                    gps_msg.eph = this.main.data_controller.params.gps_horiz_dil * 100
+                    gps_msg.eph = this.main.data_controller.params.gps_hdop * 100
                     gps_msg.lon = this.main.data_controller.params.gps_longitude * 10 ** 7
                     gps_msg.lat = this.main.data_controller.params.gps_latitude * 10 ** 7
                     gps_msg.vel = this.main.data_controller.params.gps_speed * 100
                     return gps_msg
                 }
-                case lfs.ThrottleData.MSG_ID: {
-                    const throttle_msg = new lfs.ThrottleData()
+                case ThrottleData.MSG_ID: {
+                    const throttle_msg = new ThrottleData()
                     throttle_msg.raw = this.main.data_controller.params.throttle_raw
                     throttle_msg.input = this.main.data_controller.params.throttle_input
                     throttle_msg.output = this.main.data_controller.params.throttle_output
                     return throttle_msg
                 }
-                case lfs.BrakeData.MSG_ID: {
-                    const brake_msg = new lfs.BrakeData()
+                case BrakeData.MSG_ID: {
+                    const brake_msg = new BrakeData()
                     brake_msg.raw = this.main.data_controller.params.brake_raw
                     brake_msg.input = this.main.data_controller.params.brake_input
                     brake_msg.output = this.main.data_controller.params.brake_output
                     return brake_msg
                 }
-                case lfs.VehicleData.MSG_ID: {
-                    const msg = new lfs.VehicleData()
+                case VehicleData.MSG_ID: {
+                    const msg = new VehicleData()
                     msg.power = this.main.data_controller.params.vehicle_power
                     msg.speed = this.main.data_controller.params.vehicle_speed
                     msg.heading = this.main.data_controller.params.vehicle_heading
@@ -297,14 +306,15 @@ export default class MavlinkController {
                     msg.xgyro = this.main.data_controller.params.gyro_lat * 1000
                     msg.ygyro = this.main.data_controller.params.gyro_lon * 1000
                     msg.zgyro = this.main.data_controller.params.gyro_z * 1000
+                    msg.temperature = this.main.data_controller.params.imu_temp * 100
                     return msg
                 }
-                case lfs.ComputerStatus.MSG_ID: {
-                    const msg = new lfs.ComputerStatus()
+                case ComputerStatus.MSG_ID: {
+                    const msg = new ComputerStatus()
                     msg.uptime = this.main.uptime
                     msg.cpuCore = this.main.data_controller.params.cpu_cores
                     msg.temperatureCore = this.main.data_controller.params.cpu_temp * 100
-                    msg.temperatureBoard = this.main.data_controller.params.board_temp
+                    msg.temperatureBoard = this.main.data_controller.params.board_temp * 100
                     msg.gpuCore = this.main.data_controller.params.gpu_cores
                     msg.type = this.main.data_controller.params.computer_type
                     msg.ramUsage = this.main.data_controller.params.ram_usage

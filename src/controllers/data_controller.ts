@@ -1,26 +1,27 @@
 import ADS1115 from "../../libs/ads1115_lib/ADS1115.js";
 import VCUCoMcu from "../../libs/vcu_co_mcu/vcu_co_mcu.js";
 import Main from "../../main.js";
-import GPSDriver from "../../libs/gps/gps_driver.js";
 import {MavModeFlag, MavState} from "mavlink-mappings/dist/lib/minimal.js";
 import {common} from "node-mavlink";
 import ParamsHandler from "../params_handler.js";
 import {InfluxDB, Point, WriteApi} from "@influxdata/influxdb-client";
 import {map_range} from "../helper_functions.js";
-import {DrivingMode} from "../../mavlink/lfs.js";
+import {DrivingMode} from "mavlink-lib/dist/lfs.js";
 import {GpsFixType} from "mavlink-mappings/dist/lib/common.js";
 import LSM6DS032 from "../../libs/LSM6DS032/LSM6DS032.js";
-import SystemInfo, {SystemInfoData} from "../../libs/system_info/system_info";
+import SystemInfo, {SystemInfoData} from "../../libs/system_info/system_info.js";
+import GPSDriver from "../../libs/gps/gps_driver";
+import GPS, {GGAQuality} from "gps";
 
 export const INT16_MAX = 2 ** 15 - 1
 export const INT32_MAX = 2 ** 31 - 1
 
 export default class DataController extends ParamsHandler {
 
-    ads: ADS1115
-    co_mcu: VCUCoMcu
-    gps: GPSDriver
-    imu: LSM6DS032
+    ads: ADS1115 | null = null
+    co_mcu: VCUCoMcu | null = null
+    gps: GPSDriver | null = null
+    imu: LSM6DS032 | null = null
     system_info: SystemInfo
 
     inlfuxdb_client: WriteApi
@@ -42,17 +43,20 @@ export default class DataController extends ParamsHandler {
             throttle_output: 0,
             throttle_raw_max: 255,
             throttle_raw_min: 0,
+            throttle_dz: 0,
             throttle_max_val: 0.5,
             brake_raw: 0,
             brake_input: 0,
             brake_output: 0,
             brake_raw_max: 255,
             brake_raw_min: 0,
+            brake_max_val: 0.5,
+            brake_dz: 0,
             brake_light_act: 0.05,
             foot_switch_act: 0.05,
             data_fetch_time: 10,
-            front_wheel_rad: 0.201,
-            rear_wheel_rad: 0.201,
+            front_wheel_rad: 0.250,
+            rear_wheel_rad: 0.250,
             ind_1_raw_freq: 0,
             ind_2_raw_freq: 0,
             ind_3_raw_freq: 0,
@@ -64,13 +68,16 @@ export default class DataController extends ParamsHandler {
             vehicle_power: 0,
             vehicle_heading: 0,
             vehicle_steering: 0,
+            gps_rime: 0,
             gps_speed: 0,
             gps_longitude: 0,
             gps_latitude: 0,
             gps_num_sats: 0,
             gps_altitude: 0,
             gps_mode: common.GpsFixType.NO_GPS as common.GpsFixType,
-            gps_horiz_dil: 0,
+            gps_hdop: 0,
+            gps_vdop: 0,
+            gps_heading: 0,
             dt_K_I: 0.22,
             dt_K_V: 0.026,
             red_led_output: false,
@@ -82,6 +89,7 @@ export default class DataController extends ParamsHandler {
             cool_pump_output: false,
             brake_light_out: false,
             cool_pump_start: false,
+            ts_active_out: false,
             lv_bdi: 1,
             lv_max_energy: 3.45 * 55 * 4,
             lv_cons_cap: 0,
@@ -122,7 +130,7 @@ export default class DataController extends ParamsHandler {
             cpu_cores: 0,
             cpu_temp: 0,
             gpu_cores: 0,
-            board_temp: INT16_MAX,
+            board_temp: 0,
             ram_usage: 0,
             ram_total: 0,
             storage_type: 0,
@@ -201,7 +209,7 @@ export default class DataController extends ParamsHandler {
                 min: -200,
                 max: 2000
             },
-            gps_horiz_dil: {
+            gps_hdop: {
                 min: 0
             },
             lv_bdi: {
@@ -256,18 +264,17 @@ export default class DataController extends ParamsHandler {
         }
 
         const inlfuxdb = new InfluxDB({
-            url: process.env.DOCKER_INFLUXDB_URL,
-            token: process.env.DOCKER_INFLUXDB_TOKEN
+            url: process.env.DOCKER_INFLUXDB_URL || "",
+            token: process.env.DOCKER_INFLUXDB_TOKEN || ""
         })
 
         this.measurement_name = "drive_" + new Date(Date.now()).toISOString()
 
-        this.inlfuxdb_client = inlfuxdb.getWriteApi(process.env.DOCKER_INFLUXDB_INIT_ORG, process.env.DOCKER_INFLUXDB_INIT_BUCKET, 'us')
-        this.main.logs_controller.debug("Data controller constructors initialized!")
+        this.inlfuxdb_client = inlfuxdb.getWriteApi(process.env.DOCKER_INFLUXDB_INIT_ORG || "", process.env.DOCKER_INFLUXDB_INIT_BUCKET || "", 'us')
     }
 
     async init() {
-        await this.main.logs_controller.info("Initializing data controller..")
+        await this.main.logs_controller.debug("Initializing data controller..")
         this.on("error", (err) => {
             this.main.logs_controller.error("Error with data:", err)
         })
@@ -289,61 +296,141 @@ export default class DataController extends ParamsHandler {
             }
         })
 
-        this.co_mcu.on("error", (err) => this.main.logs_controller.error("CoMCU Error:", err))
-        this.imu.on("error", (err) => this.main.logs_controller.error("IMU Error:", err))
-        this.imu.on("data", (data) => {
-            this.params.imu_temp = data[0]
-            this.params.acc_lat = data[1]
-            this.params.acc_lon = data[2]
-            this.params.acc_z = data[3]
-            this.params.gyro_lat = data[4]
-            this.params.gyro_lon = data[5]
-            this.params.gyro_z = data[6]
+        if (this.imu && !this.main.isInSystemMode(MavModeFlag.HIL_ENABLED)) {
+            this.imu.on("error", (err) => this.main.logs_controller.error("IMU Error:", err))
+            this.imu.on("data", (data) => {
+                this.params.imu_temp = data[0]
+                this.params.acc_lat = data[1]
+                this.params.acc_lon = data[2]
+                this.params.acc_z = data[3]
+                this.params.gyro_lat = data[4]
+                this.params.gyro_lon = data[5]
+                this.params.gyro_z = data[6]
 
-            const current_time = this.main.uptime
-            if (this.last_imu_update > 0) {
-                this.params.imu_lon_speed += (current_time - this.last_imu_update) * (this.previous_imu_lon_speed + this.params.acc_lon) / (1000 * 2)
-                this.previous_imu_lon_speed = this.params.acc_lon
-                this.calculateVehicleSpeed()
-            }
-            this.last_imu_update = current_time
-        })
+                const current_time = this.main.uptime
+                if (this.last_imu_update > 0) {
+                    this.params.imu_lon_speed += (current_time - this.last_imu_update) * (this.previous_imu_lon_speed + this.params.acc_lon) / (1000 * 2)
+                    this.previous_imu_lon_speed = this.params.acc_lon
+                    this.calculateVehicleSpeed()
+                }
+                this.last_imu_update = current_time
+            })
 
-        if (this.main.in_production) {
-            if (!this.main.isInSystemMode(MavModeFlag.HIL_ENABLED)) {
-                this.imu.startPoll(20)
-                this.co_mcu.startPoll(50, 200)
-            }
+            this.imu.startPoll(20)
         }
 
-        this.co_mcu.on("analog_sensors", (data: number[]) => {
-            let temp_raw = 0
-                [this.params.throttle_raw, this.params.brake_raw, this.params.steering_raw, temp_raw] = data
-            this.params.board_temp = (temp_raw - 100) / 10
-            if (!this.main.isInSystemMode(MavModeFlag.TEST_ENABLED) && !this.main.isInSystemMode(MavModeFlag.HIL_ENABLED)) {
-                this.params.throttle_input = map_range(this.params.throttle_raw, this.params.throttle_raw_min, this.params.throttle_raw_max, 0, 1)
-                this.params.brake_input = map_range(this.params.brake_raw, this.params.brake_raw_min, this.params.brake_raw_max, 0, 1)
-            }
-        })
+        if (this.co_mcu) {
+            this.co_mcu.on("error", (err) => this.main.logs_controller.error("CoMCU Error:", err))
 
-        this.co_mcu.on("ts_active", (ts_active) => {
-            this.main.setSystemState(ts_active == 1 ? MavState.ACTIVE : MavState.STANDBY)
-        })
+            this.co_mcu.on("analog_sensors", (data: number[]) => {
+                this.params.throttle_raw = data[0]
+                this.params.brake_raw = data[1]
+                this.params.steering_raw = data[2]
+                this.params.board_temp = (data[3] - 100) / 10
 
-        this.co_mcu.on("ind_sensors", (data) => {
-            [this.params.ind_1_raw_freq, this.params.ind_2_raw_freq, this.params.ind_2_raw_freq] = data
-            this.params.fl_wheel_speed = this.params.ind_1_raw_freq * this.params.front_wheel_rad * this.FREQ_TO_VELOCITY_CONST
-            this.params.fr_wheel_speed = this.params.ind_2_raw_freq * this.params.front_wheel_rad * this.FREQ_TO_VELOCITY_CONST
-            this.params.rear_axle_speed = this.params.ind_3_raw_freq * this.params.rear_wheel_rad * this.FREQ_TO_VELOCITY_CONST
-            this.calculateVehicleSpeed()
-        })
+                if (!this.main.isInSystemMode(MavModeFlag.TEST_ENABLED) && !this.main.isInSystemMode(MavModeFlag.HIL_ENABLED)) {
+                    this.params.throttle_input = map_range(this.params.throttle_raw, this.params.throttle_raw_min, this.params.throttle_raw_max, 0, 1)
+                    this.params.brake_input = map_range(this.params.brake_raw, this.params.brake_raw_min, this.params.brake_raw_max, 0, 1)
+                }
+            })
 
-        this.gps.on("data", (packet: any) => {
-            Object.assign(this.params, packet)
-            if (this.params.gps_mode == GpsFixType.NO_GPS) {
-                this.params.gps_mode = GpsFixType.NO_FIX
-            }
-        })
+            this.co_mcu.on("ts_active", (ts_active) => {
+                if (this.params.system_state == MavState.STANDBY && ts_active == 1) {
+                    this.main.setSystemState(MavState.ACTIVE)
+                } else if (this.params.system_state == MavState.ACTIVE && ts_active == 0) {
+                    this.main.setSystemState(MavState.STANDBY)
+                    if (this.params.ts_active_out) {
+                        this.main.onUnexpectedTSShutdown()
+                    }
+                }
+            })
+
+            this.co_mcu.on("ind_sensors", (data) => {
+                [this.params.ind_1_raw_freq, this.params.ind_2_raw_freq, this.params.ind_2_raw_freq] = data
+                this.params.fl_wheel_speed = this.params.ind_1_raw_freq * this.params.front_wheel_rad * this.FREQ_TO_VELOCITY_CONST
+                this.params.fr_wheel_speed = this.params.ind_2_raw_freq * this.params.front_wheel_rad * this.FREQ_TO_VELOCITY_CONST
+                this.params.rear_axle_speed = this.params.ind_3_raw_freq * this.params.rear_wheel_rad * this.FREQ_TO_VELOCITY_CONST
+                this.calculateVehicleSpeed()
+            })
+
+            this.co_mcu.startPoll(50, 200)
+        }
+
+        if (this.gps) {
+            this.gps.on("data", (data: any) => {
+                if (data.hasOwnProperty("time")) {
+                    this.params.gps_latitude = (data.time as Date).getTime()
+                }
+                if (data.hasOwnProperty("lat") && data.hasOwnProperty("lon")) {
+                    this.params.gps_latitude = data.lat
+                    this.params.gps_longitude = data.lon
+                    this.params.gps_heading = this.gps!.heading
+                }
+                if (data.hasOwnProperty("alt")) {
+                    this.params.gps_altitude = data.alt
+                }
+                if (data.hasOwnProperty("speed")) {
+                    this.params.gps_speed = data.speed
+                }
+                if (data.hasOwnProperty("satsActive")) {
+                    this.params.gps_num_sats = data.satsActive
+                }
+                if (data.hasOwnProperty("hdop")) {
+                    this.params.gps_hdop = data.hdop
+                }
+                if (data.hasOwnProperty("vdop")) {
+                    this.params.gps_vdop = data.vdop
+                }
+                if (data.hasOwnProperty("quality")) {
+                    switch ((data.quality as GGAQuality)) {
+                        case GPS.GGAQuality["dgps-fix"]: {
+                            this.params.gps_mode = GpsFixType.DGPS
+                            break;
+                        }
+                        case GPS.GGAQuality["fix"]: {
+                            this.params.gps_mode = GpsFixType.GPS_FIX_TYPE_2D_FIX
+                            break;
+                        }
+                        case GPS.GGAQuality["pps-fix"]: {
+                            this.params.gps_mode = GpsFixType.PPP
+                            break;
+                        }
+                        case GPS.GGAQuality["rtk"]: {
+                            this.params.gps_mode = GpsFixType.RTK_FIXED
+                            break;
+                        }
+                        case GPS.GGAQuality["rtk-float"]: {
+                            this.params.gps_mode = GpsFixType.RTK_FLOAT
+                            break;
+                        }
+                        case GPS.GGAQuality["estimated"]: {
+                            this.params.gps_mode = GpsFixType.STATIC
+                            break;
+                        }
+                        case GPS.GGAQuality["manual"]: {
+                            this.params.gps_mode = GpsFixType.STATIC
+                            break;
+                        }
+                        case GPS.GGAQuality["simulated"]: {
+                            this.params.gps_mode = GpsFixType.STATIC
+                            break;
+                        }
+                    }
+
+                }
+                if (data.hasOwnProperty("fix")) {
+                    this.params.gps_mode = data.fix == "3D"? GpsFixType.GPS_FIX_TYPE_3D_FIX: GpsFixType.GPS_FIX_TYPE_2D_FIX
+                }
+                if (data.hasOwnProperty("heading")) {
+                    this.params.gps_heading = data.heading
+                }
+
+
+                if (this.params.gps_mode == GpsFixType.NO_GPS) {
+                    this.params.gps_mode = GpsFixType.NO_FIX
+                }
+            })
+        }
 
         this.system_info.on("data", (data: SystemInfoData) => {
             this.params.cpu_cores = data.cpu.usage
@@ -369,22 +456,26 @@ export default class DataController extends ParamsHandler {
             }
         })
 
-        await this.main.logs_controller.info("Done initializing data controller!")
+        await this.main.logs_controller.debug("Data controller initialized!")
     }
 
     calculateVehicleSpeed() {
-        let vehicle_speed = (this.params.fl_wheel_speed + this.params.fr_wheel_speed + this.params.rear_axle_speed) / 3
+        const speeds = [this.params.fl_wheel_speed, this.params.fr_wheel_speed, this.params.rear_axle_speed]
 
         if (this.params.gps_speed > 1) {
-            vehicle_speed += this.params.gps_speed * 3.6
-            vehicle_speed /= 2
+            speeds.push(this.params.gps_speed)
         }
 
         if (this.params.imu_lon_speed > 1) {
-            vehicle_speed += this.params.imu_lon_speed * 3.6
-            vehicle_speed /= 2
+            speeds.push(this.params.imu_lon_speed)
         }
 
-        this.params.vehicle_speed = Math.round(vehicle_speed)
+        let vehicle_speed = 0
+        for (let i = 0; i < speeds.length; i++) {
+            vehicle_speed += speeds[i]
+        }
+
+        console.log(this.params.fl_wheel_speed, this.params.fr_wheel_speed, this.params.rear_axle_speed, this.params.gps_speed, this.params.imu_lon_speed)
+        this.params.vehicle_speed = Math.round(vehicle_speed * 3.6 / speeds.length)
     }
 }

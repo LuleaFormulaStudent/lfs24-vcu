@@ -4,10 +4,10 @@ import os from "os";
 import EventEmitter from "node:events";
 
 export default class DS3502 extends EventEmitter {
-    private i2c_device: I2CBus
+    private i2c_device: I2CBus | null = null
 
     private static MAX_VAL = 127
-    private static MIN_VAL =  0
+    private static MIN_VAL = 0
 
     private DS3502_WIPER = 0x00
     private DS3502_MODE = 0x02
@@ -53,12 +53,12 @@ export default class DS3502 extends EventEmitter {
         }
     }
 
-    private to_safe(v:number) {
-        return Math.max(Math.min(DS3502.MAX_VAL, Math.round(v*DS3502.MAX_VAL)), DS3502.MIN_VAL)
+    private to_safe(v: number) {
+        return Math.max(Math.min(DS3502.MAX_VAL, Math.round(v * DS3502.MAX_VAL)), DS3502.MIN_VAL)
     }
 
-    async setDefault(v) {
-        if (v < 0 || v > 127) {
+    async setDefault(v: number) {
+        if (v < 0 || v > 1) {
             return false
         } else {
             try {

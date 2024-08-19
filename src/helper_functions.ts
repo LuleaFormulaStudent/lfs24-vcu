@@ -16,7 +16,7 @@ export function genRandomHash(length: number){
         .join("")
 }
 
-export function times(val, count: number):(typeof val)[] {
+export function times(val: any, count: number):(typeof val)[] {
     return new Array(count).fill(val)
 }
 
@@ -24,12 +24,12 @@ export function sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export function map_range(value, low1, high1, low2, high2) {
+export function map_range(value: number, low1: number, high1: number, low2: number, high2: number) {
    const v = low2 + (high2 - low2) * (value - low1) / (high1 - low1);
    return isNaN(v)? 0 : v
 }
 
-export function range(start, stop?: number, step: number = 1) {
+export function range(start: number, stop?: number, step: number = 1) {
     if (typeof stop == 'undefined') {
         stop = start;
         start = 0;

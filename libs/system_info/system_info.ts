@@ -1,6 +1,7 @@
 import EventEmitter from "node:events";
 import osu from "node-os-utils";
 import fs from "fs";
+import os from "os";
 
 export interface SystemInfoData {
     cpu: {
@@ -20,19 +21,21 @@ export interface SystemInfoData {
 }
 
 export default class SystemInfo extends EventEmitter {
-
     constructor() {
         super();
 
         setInterval(async () => {
             const mem_info = await osu.mem.used()
-            const storage_info = await osu.drive.info("/")
+            const storage_info = os.arch().includes("arm")? await osu.drive.info("/") : {
+                usedGb: "0",
+                totalGb: "0"
+            }
 
             this.emit("data", {
                 cpu: {
                     cores: osu.cpu.count(),
                     usage: await osu.cpu.usage(),
-                    temp: parseInt(fs.readFileSync("/sys/class/thermal/thermal_zone0/temp", {encoding: "utf-8"})) / 1000
+                    temp: os.arch().includes("arm")? parseInt(fs.readFileSync("/sys/class/thermal/thermal_zone0/temp", {encoding: "utf-8"})) / 1000 : 0
                 },
                 ram: {
                     usage: mem_info.usedMemMb,

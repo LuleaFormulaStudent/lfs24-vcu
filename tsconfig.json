@@ -1,7 +1,7 @@
 {
     "compilerOptions": {
         /* Basic Options */
-        // "incremental": true,                   /* Enable incremental compilation */
+       "incremental": true,                   /* Enable incremental compilation */
         "target": "ESNext",
         /* Specify ECMAScript target version: 'ES3' (default), 'ES5', 'ES2015', 'ES2016', 'ES2017', 'ES2018', 'ES2019' or 'ESNEXT'. */
         "module": "ESNext",
@@ -31,9 +31,9 @@
         "isolatedModules": true,               /* Transpile each file as a separate module (similar to 'ts.transpileModule'). */
 
         /* Strict Type-Checking Options */
-        "strict": false,
+        "strict": true,
         /* Enable all strict type-checking options. */
-        "noImplicitAny": false,                 /* Raise error on expressions and declarations with an implied 'any' type. */
+        "noImplicitAny": true,                 /* Raise error on expressions and declarations with an implied 'any' type. */
         // "strictNullChecks": true,              /* Enable strict null checks. */
         // "strictFunctionTypes": true,           /* Enable strict checking of function types. */
         // "strictBindCallApply": true,           /* Enable strict 'bind', 'call', and 'apply' methods on functions. */
@@ -53,12 +53,11 @@
         // "baseUrl": "./",                       /* Base directory to resolve non-absolute module names. */
         // "paths": {},                           /* A series of entries which re-map imports to lookup locations relative to the 'baseUrl'. */
         "rootDirs": [
-            "mavlink",
             "src",
             "libs"
         ],                        /* List of root folders whose combined content represents the structure of the project at runtime. */
         // "typeRoots": [],                       /* List of folders to include type definitions from. */
-        // "types": [],                           /* Type declaration files to be included in compilation. */
+        "types": ["./declarations.d.ts"],                           /* Type declaration files to be included in compilation. */
         "allowSyntheticDefaultImports": true,
         /* Allow default imports from modules with no default export. This does not affect code emit, just typechecking. */
         "allowImportingTsExtensions": false,
@@ -80,12 +79,13 @@
         /* Advanced Options */
         "forceConsistentCasingInFileNames": true,
         /* Disallow inconsistently-cased references to the same file. */
-        "resolveJsonModule": true
+        "resolveJsonModule": true,
     },
     "exclude": [
         "dist",
         "node_modules",
         "test",
-        "tools"
+        "tools",
+        "mavlink-lib"
     ]
 }

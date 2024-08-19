@@ -4,7 +4,7 @@ import EventEmitter from "node:events";
 import {sleep} from "node-mavlink";
 
 export default class VCUCoMcu extends EventEmitter {
-    private i2c_device: I2CBus
+    private i2c_device: I2CBus | null = null
     private analog_interval: any
     private ind_interval: any
     initialized = false

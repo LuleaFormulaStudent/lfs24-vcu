@@ -8,16 +8,16 @@ export default class HILController {
 
     constructor(private main: Main) {
         this.server = createServer()
-        this.main.logs_controller.debug("HIL controller constructor initialized!")
+
     }
 
     async init() {
         if (this.main.isInSystemMode(MavModeFlag.HIL_ENABLED)) {
             await this.main.logs_controller.info("Initializing HIL server..")
             await this.activateHIL()
-        } else {
-            await this.main.logs_controller.info("Skipping initialization of HIL server")
         }
+
+        await this.main.logs_controller.debug("HIL controller initialized!")
     }
 
     async activateHIL() {

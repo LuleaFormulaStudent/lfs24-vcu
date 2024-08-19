@@ -1,70 +1,82 @@
 import Main from "../../main.js";
-import {common, send} from "node-mavlink";
+import {common} from "node-mavlink";
 import {sleep} from "../helper_functions.js";
+import fs from "fs";
+import path from "path";
+import {MavSeverity} from "mavlink-mappings/dist/lib/common";
 
-export default class LogsController  {
+export default class LogsController {
 
-    logs: {id: number, text: string, severity: common.MavSeverity}[] = []
+    logs: { id: number, text: string, severity: common.MavSeverity }[] = []
     log_id: number = -1
     ready_to_send = false
 
     chunk_size = 47
 
-    constructor(private main: Main) {}
+    logs_path: string = process.env.LOGS_PATH || ""
+
+    constructor(private main: Main) {
+        if (this.logs_path.length && !fs.existsSync(this.logs_path)) {
+            fs.mkdirSync(this.logs_path)
+        }
+    }
 
     async init() {
 
     }
 
-    severity_text(severity: common.MavSeverity): string {
-        switch(severity) {
-            case common.MavSeverity.ALERT: return "[ALERT]"
-            case common.MavSeverity.DEBUG: return "[DEBUG]"
-            case common.MavSeverity.EMERGENCY: return "[EMERGENCY]"
-            case common.MavSeverity.ERROR: return "[ERROR]"
-            case common.MavSeverity.CRITICAL: return "[CRITICAL]"
-            case common.MavSeverity.NOTICE: return "[NOTICE]"
-            case common.MavSeverity.WARNING: return "[WARNING]"
-            case common.MavSeverity.INFO: return "[INFO]"
-            default: return "[DEFAULT]"
+    formatCurrentDate(date: Date): string {
+        return `${date.getFullYear()}-${(date.getMonth() < 9 ? "0" : "") + (date.getMonth() + 1)}-${(date.getDate() <= 9 ? "0" : "") + date.getDate()}`
+    }
+
+    getTime(date: Date): string {
+        return `${(date.getHours() <= 9 ? "0" : "") + date.getHours()}:${(date.getMinutes() <= 9 ? "0" : "") + date.getMinutes()}:${(date.getSeconds() <= 9 ? "0" : "") + date.getSeconds()}`
+    }
+
+    writeToFile(log_path: string, str: string) {
+        const file_path = path.join(this.logs_path, log_path)
+        const file_path_base = path.dirname(file_path)
+        if (!fs.existsSync(file_path_base)) {
+            fs.mkdirSync(file_path_base)
         }
+
+        if (fs.existsSync(file_path)) {
+            fs.appendFileSync(file_path, str + "\n", {encoding: "utf-8"})
+        } else {
+            fs.writeFileSync(file_path, str + "\n", {encoding: "utf-8"})
+        }
+    }
+
+    async log(text: string, severity: MavSeverity, log_fn = console.log, err: any = null,) {
+        const date = new Date(Date.now())
+        const severity_text = MavSeverity[severity].toString()
+        log_fn(`[${this.formatCurrentDate(date)} ${this.getTime(date)}] [${severity_text}]`, text, err ? err : "")
+        this.log_id++
+        this.logs.push({id: this.log_id, severity: severity, text})
+
+        if (this.ready_to_send) {
+            await this.sendLogMsg(this.log_id, severity, text)
+        }
+
+        const log_text = `[${this.formatCurrentDate(date)} ${this.getTime(date)}] [${severity_text}] ` + text
+        this.writeToFile(`main/full_` + this.formatCurrentDate(date) + ".log", log_text)
+        this.writeToFile(`main/${severity_text.toLowerCase()}_` + this.formatCurrentDate(date) + ".log", log_text)
     }
 
     async info(text: string) {
-        console.log(this.severity_text(common.MavSeverity.INFO), text)
-        this.log_id++
-        this.logs.push({id: this.log_id, severity: common.MavSeverity.INFO, text})
-        if (this.ready_to_send) {
-            await this.sendLogMsg(this.log_id, common.MavSeverity.INFO, text)
-        }
+        await this.log(text, MavSeverity.INFO)
     }
 
     async debug(text: string) {
-        console.log(this.severity_text(common.MavSeverity.DEBUG), text)
-        this.log_id++
-        this.logs.push({id: this.log_id, severity: common.MavSeverity.DEBUG, text})
-        if (this.ready_to_send) {
-            await this.sendLogMsg(this.log_id, common.MavSeverity.DEBUG, text)
-        }
+        await this.log(text, MavSeverity.DEBUG)
     }
 
     async warning(text: string) {
-        console.log(this.severity_text(common.MavSeverity.WARNING), text)
-        this.log_id++
-        this.logs.push({id: this.log_id, severity: common.MavSeverity.WARNING, text})
-        if (this.ready_to_send) {
-            await this.sendLogMsg(this.log_id, common.MavSeverity.WARNING, text)
-        }
+        await this.log(text, MavSeverity.WARNING, console.warn)
     }
 
     async error(text: string, err: any = null) {
-        console.error(this.severity_text(common.MavSeverity.ERROR), text, err != null? err : "")
-        text += err != null? " " + err.toString() : ""
-        this.log_id++
-        this.logs.push({id: this.log_id, severity: common.MavSeverity.ERROR, text})
-        if (this.ready_to_send) {
-            await this.sendLogMsg(this.log_id, common.MavSeverity.ERROR, text)
-        }
+        await this.log(text, MavSeverity.ERROR, console.error, err)
     }
 
     private async sendLogMsg(id: number, severity: common.MavSeverity, text: string) {
@@ -74,7 +86,7 @@ export default class LogsController  {
             const msg = new common.StatusText()
             msg.severity = severity
             msg.id = id
-            msg.text = text.substring(chunk_id*this.chunk_size, (chunk_id + 1)*this.chunk_size)
+            msg.text = text.substring(chunk_id * this.chunk_size, (chunk_id + 1) * this.chunk_size)
             msg.chunkSeq = chunk_id
             if (chunk_id >= chunks - 1) {
                 msg.text += "<@>"
@@ -86,7 +98,6 @@ export default class LogsController  {
                 await sleep(50)
             }
         }
-
     }
 
     async onLogListRequest(start_id: number, end_id: number) {
@@ -104,7 +115,7 @@ export default class LogsController  {
                 await sleep(100)
             }
             this.ready_to_send = true
-        } catch(err) {
+        } catch (err) {
             this.ready_to_send = true
             await this.error("Error when sending log list..", err)
         }

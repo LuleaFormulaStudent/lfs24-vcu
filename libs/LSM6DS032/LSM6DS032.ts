@@ -7,20 +7,12 @@ import RWBit from "./rwbit.js";
 import RWBits from "./rwbits.js";
 import Struct from "./struct.js";
 
-export function i2c_write_read(i2c: I2CBus, adress: number, buffer: Buffer): Buffer {
-    i2c.i2cWriteSync(adress, 1, buffer)
-    const read_buf = Buffer.alloc(buffer.length - 1)
-    i2c.i2cReadSync(adress, read_buf.length, read_buf)
-    buffer.set(read_buf, 1)
-    return buffer
-}
-
 export default class LSM6DS032 extends EventEmitter {
-    private i2c_device: I2CBus
+    private i2c_device: I2CBus | null = null
 
     interval: any
 
-    readonly gyro_ranges = {
+    readonly gyro_ranges: { [propName: string]: number } = {
         "RANGE_125_DPS": 125,
         "RANGE_250_DPS": 0,
         "RANGE_500_DPS": 1,
@@ -28,7 +20,7 @@ export default class LSM6DS032 extends EventEmitter {
         "RANGE_2000_DPS": 3,
     }
 
-    readonly gyro_ranges_convert = {
+    readonly gyro_ranges_convert: { [propName: string]: number } = {
         "RANGE_125_DPS": 4.375,
         "RANGE_250_DPS": 8.75,
         "RANGE_500_DPS": 17.50,
@@ -36,21 +28,21 @@ export default class LSM6DS032 extends EventEmitter {
         "RANGE_2000_DPS": 2000,
     }
 
-    readonly accel_range = {
+    readonly accel_range: { [propName: string]: number } = {
         "RANGE_2G": 0,
         "RANGE_16G": 1,
         "RANGE_4G": 2,
         "RANGE_8G": 3,
     }
 
-    readonly accel_range_convert = {
+    readonly accel_range_convert: { [propName: string]: number } = {
         "RANGE_2G": 0.061,
         "RANGE_16G": 0.488,
         "RANGE_4G": 0.122,
         "RANGE_8G": 0.244,
     }
 
-    readonly rate_range = {
+    readonly rate_range: { [propName: string]: number } = {
         "RATE_SHUTDOWN": 0,
         "RATE_12_5_HZ": 1,
         "RATE_26_HZ": 2,
@@ -65,7 +57,7 @@ export default class LSM6DS032 extends EventEmitter {
         "RATE_1_6_HZ": 11,
     }
 
-    readonly accel_hpf = {
+    readonly accel_hpf: { [propName: string]: number } = {
         "SLOPE": 0,
         "HPF_DIV100": 1,
         "HPF_DIV9": 2,
@@ -107,44 +99,44 @@ export default class LSM6DS032 extends EventEmitter {
     current_gyro_range = ""
 
     // ROUnaryStructs:
-    _chip_id: UnaryStruct
+    _chip_id: UnaryStruct | null = null
 
     // Structs
-    _raw_accel_data: Struct
-    _raw_gyro_data: Struct
-    _raw_temp_data: Struct
-    _emb_func_en_a: Struct
-    _emb_func_en_b: Struct
-    _mlc0_src: Struct
+    _raw_accel_data: Struct | null = null
+    _raw_gyro_data: Struct | null = null
+    _raw_temp_data: Struct | null = null
+    _emb_func_en_a: Struct | null = null
+    _emb_func_en_b: Struct | null = null
+    _mlc0_src: Struct | null = null
     //RWBits:
-    _accel_range: RWBits
-    _accel_data_rate: RWBits
+    _accel_range: RWBits | null = null
+    _accel_data_rate: RWBits | null = null
 
-    _gyro_data_rate: RWBits
-    _gyro_range: RWBits
-    _gyro_range_125dps: RWBit
+    _gyro_data_rate: RWBits | null = null
+    _gyro_range: RWBits | null = null
+    _gyro_range_125dps: RWBit | null = null
 
-    _sw_reset: RWBit
-    _bdu: RWBit
+    _sw_reset: RWBit | null = null
+    _bdu: RWBit | null = null
 
-    _high_pass_filter: RWBits
-    _i3c_disable: RWBit
-    _pedometer_reset: RWBit
-    _func_enable: RWBit
-    _mem_bank: RWBit
-    _mlc_status: RWBit
-    _block_data_enable: RWBit
-    _route_int1: RWBit
-    _tap_latch: RWBit
-    _tap_clear: RWBit
-    _ped_enable: RWBit
-    pedometer_steps: UnaryStruct
-    CHIP_ID: number
+    _high_pass_filter: RWBits | null = null
+    _i3c_disable: RWBit | null = null
+    _pedometer_reset: RWBit | null = null
+    _func_enable: RWBit | null = null
+    _mem_bank: RWBit | null = null
+    _mlc_status: RWBit | null = null
+    _block_data_enable: RWBit | null = null
+    _route_int1: RWBit | null = null
+    _tap_latch: RWBit | null = null
+    _tap_clear: RWBit | null = null
+    _ped_enable: RWBit | null = null
+    pedometer_steps: UnaryStruct | null = null
+    CHIP_ID: number = 0
 
-    _cached_accel_range = null
-    _cached_gyro_range = null
+    _cached_accel_range: string = ""
+    _cached_gyro_range: string = ""
 
-    initialized = false
+    initialized: boolean = false
 
     constructor(private adress: number = 0x6A, private bus_num: number = 1) {
         super()
@@ -215,83 +207,112 @@ export default class LSM6DS032 extends EventEmitter {
     accel_range_cache = ""
     gyro_range_cache = ""
 
-    startPoll(interval: number = 10) {
+    startPoll(interval: number = 10): boolean {
         this.interval = setInterval(async () => {
             if (this.initialized) {
                 this.emit("data", [this.temperature, ...this.acceleration, ...this.gyro])
             }
         }, interval)
+        return true
     }
 
-    get acceleration() {
-        const raw_accel_data = this._raw_accel_data.val
-        const x = raw_accel_data[0] * this.accel_range_convert[this.accel_range_cache] * this._MILLI_G_TO_ACCEL
-        const y = raw_accel_data[1] * this.accel_range_convert[this.accel_range_cache] * this._MILLI_G_TO_ACCEL
-        const z = raw_accel_data[2] * this.accel_range_convert[this.accel_range_cache] * this._MILLI_G_TO_ACCEL
-        return [x, y, z]
+    get acceleration(): [number, number, number] {
+        if (this._raw_accel_data) {
+            const raw_accel_data = this._raw_accel_data.val
+            const x = raw_accel_data[0] * this.accel_range_convert[this.accel_range_cache] * this._MILLI_G_TO_ACCEL
+            const y = raw_accel_data[1] * this.accel_range_convert[this.accel_range_cache] * this._MILLI_G_TO_ACCEL
+            const z = raw_accel_data[2] * this.accel_range_convert[this.accel_range_cache] * this._MILLI_G_TO_ACCEL
+            return [x, y, z]
+        } else {
+            return [0, 0, 0]
+        }
     }
 
-    get gyro() {
-        const raw_gyro_data = this._raw_gyro_data.val
-        const x = raw_gyro_data[0] * this.gyro_ranges_convert[this.gyro_range_cache] * Math.PI / 180.0 / 1000
-        const y = raw_gyro_data[1] * this.gyro_ranges_convert[this.gyro_range_cache] * Math.PI / 180.0 / 1000
-        const z = raw_gyro_data[2] * this.gyro_ranges_convert[this.gyro_range_cache] * Math.PI / 180.0 / 1000
-        return [x, y, z]
+    get gyro(): [number, number, number] {
+        if (this._raw_gyro_data) {
+            const raw_gyro_data = this._raw_gyro_data.val
+            const x = raw_gyro_data[0] * this.gyro_ranges_convert[this.gyro_range_cache] * Math.PI / 180.0 / 1000
+            const y = raw_gyro_data[1] * this.gyro_ranges_convert[this.gyro_range_cache] * Math.PI / 180.0 / 1000
+            const z = raw_gyro_data[2] * this.gyro_ranges_convert[this.gyro_range_cache] * Math.PI / 180.0 / 1000
+            return [x, y, z]
+        } else {
+            return [0, 0, 0]
+        }
     }
 
-    get accelerometer_range(): number {
-        return this._accel_range.val
+    get accelerometer_range(): string {
+        return this._cached_accel_range
     }
 
     set accelerometer_range(value: string) {
         if (!Object.keys(this.accel_range).includes(value)) {
             throw Error("Range most be a accel range")
         }
-        this._accel_range.val = this.accel_range[value]
-        this.accel_range_cache = value
+        if (this._accel_range) {
+            this._accel_range.val = this.accel_range[value]
+            this.accel_range_cache = value
+        }
     }
 
-    get gyro_range(): number {
-        return this._gyro_range.val
+    get gyro_range(): string {
+        return this._cached_gyro_range
     }
 
     set gyro_range(value: string) {
         if (!Object.keys(this.gyro_ranges).includes(value)) {
             throw Error("Range most be a gyro range")
         }
-        if (value == "RANGE_125_DPS") {
-            this._gyro_range_125dps.val = true
-        } else {
-            this._gyro_range_125dps.val = false
-            this._gyro_range.val = this.gyro_ranges[value]
+        if (this._gyro_range_125dps && this._gyro_range) {
+            if (value == "RANGE_125_DPS") {
+                this._gyro_range_125dps.val = true
+            } else {
+                this._gyro_range_125dps.val = false
+                this._gyro_range.val = this.gyro_ranges[value]
+            }
+            this.gyro_range_cache = value
         }
-        this.gyro_range_cache = value
     }
 
     get accelerometer_data_rate(): number {
-        return this._accel_data_rate.val
+        if (this._accel_data_rate) {
+            return this._accel_data_rate.val
+        } else {
+            return 0
+        }
     }
 
     set accelerometer_data_rate(value: string) {
         if (!Object.keys(this.rate_range).includes(value)) {
             throw Error("Range most be a rate range")
         }
-        this._accel_data_rate.val = this.rate_range[value]
+        if (this._accel_data_rate) {
+            this._accel_data_rate.val = this.rate_range[value]
+        }
     }
 
     get gyro_data_rate(): number {
-        return this._gyro_data_rate.val
+        if (this._gyro_data_rate) {
+            return this._gyro_data_rate.val
+        } else {
+            return 0
+        }
     }
 
     set gyro_data_rate(value: string) {
         if (!Object.keys(this.rate_range).includes(value)) {
             throw Error("Range most be a rate range")
         }
-        this._gyro_data_rate.val = this.rate_range[value]
+        if (this._gyro_data_rate) {
+            this._gyro_data_rate.val = this.rate_range[value]
+        }
     }
 
-    get temperature() {
-        return this._raw_temp_data.val[0] / this._TEMPERATURE_SENSITIVITY + this._TEMPERATURE_OFFSET
+    get temperature(): number {
+        if (this._raw_temp_data) {
+            return this._raw_temp_data.val[0] / this._TEMPERATURE_SENSITIVITY + this._TEMPERATURE_OFFSET
+        } else {
+            return 0
+        }
     }
 
 }
