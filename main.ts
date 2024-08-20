@@ -15,6 +15,7 @@ import {DrivingMode} from "mavlink-lib/dist/lfs.js";
 import {waitFor} from "node-mavlink";
 import {exec} from "node:child_process";
 import AdmZip from "adm-zip";
+import fs from "fs";
 
 configDotenv()
 
@@ -201,13 +202,17 @@ export default class Main {
         if (test_result) {
             await this.logs_controller.info("Testing firmware passed!")
             await this.logs_controller.info("Extracting files..")
-            await zip.extractAllToAsync("./")
+            if (fs.existsSync("./source")) {
+                await zip.extractAllToAsync("./source")
+            } else {
+                await this.logs_controller.error("Source folder does not exists!")
+            }
             await this.logs_controller.info("Done!")
             const results = await import("./package.json")
             await this.logs_controller.info("New version: " + results.version)
             if (this.in_production) {
                 await this.logs_controller.info("Rebooting system..")
-                exec('sudo /sbin/shutdown -r now');
+                //exec('sudo /sbin/shutdown -r now');
             }
         } else {
             await this.logs_controller.error("Firmware did not pass testing, maybe it is corrupt")

@@ -2,7 +2,7 @@ services:
     database:
         container_name: influxdb
         image: influxdb
-        restart: always
+        restart: on-failure
         networks:
             - lfs-network
         env_file: ./.env
@@ -34,7 +34,8 @@ services:
             - "5432:5432"
             - "6000:6000"
         volumes:
-            - ./:/lfs-vcu/
+            - ./data:/lfs-vcu/data
+            - ./:/lfs-vcu/source
             - /var/run/docker.sock:/var/run/docker.sock
         extra_hosts:
             - "host.docker.internal:host-gateway"
