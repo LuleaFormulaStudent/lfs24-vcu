@@ -23,7 +23,8 @@ services:
         command: "npm run prod"
         env_file: ./.env
         privileged: true
-        restart: always
+        restart: on-failure
+
         depends_on:
             database:
                 condition: service_healthy
@@ -33,7 +34,8 @@ services:
             - "5432:5432"
             - "6000:6000"
         volumes:
-            - ./data:/lfs-vcu/data
+            - ./:/lfs-vcu/
+            - /var/run/docker.sock:/var/run/docker.sock
         extra_hosts:
             - "host.docker.internal:host-gateway"
         devices:

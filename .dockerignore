@@ -1,10 +1,11 @@
 node_modules
-logs
 old
-other
-tests
-data/*
-*.db
+data
 package-lock.json
 README.md
 .idea
+dist
+.git
+lfs24-vcu.iml
+.gitignore
+.gitlab-ci.yml

@@ -14,7 +14,7 @@ import {Writable} from "node:stream";
 import {MavAutopilot, MavModeFlag, MavType} from "mavlink-mappings/dist/lib/minimal.js";
 import {Heartbeat} from "node-mavlink-heartbeat";
 import {MavLinkData} from "mavlink-mappings";
-import {MavFTP} from "node-mavlink-ftp";
+import {FileTransferProtocolPayloadSerializer, MavFTP} from "node-mavlink-ftp";
 import Main from "../../main.js";
 import {connect, Socket} from "node:net";
 import {MavLinkPacket} from "node-mavlink/dist/lib/mavlink.js";
@@ -23,10 +23,14 @@ import {
     MavBatteryFunction,
     MavBatteryMode,
     MavBatteryType,
+    MavFtpOpcode,
     MavParamType
 } from "mavlink-mappings/dist/lib/common.js";
 import {sleep} from "../helper_functions.js";
 import {BrakeData, ComputerStatus, REGISTRY, ThrottleData, VehicleData} from "mavlink-lib/dist/lfs.js"
+import fs from "fs";
+import path from "path";
+import AdmZip from "adm-zip"
 
 export default class MavlinkController {
 
@@ -48,12 +52,18 @@ export default class MavlinkController {
     mav_messages_interval_times: { [propName: number]: number } = {}
     mav_messages_intervals: { [propName: number]: any } = {}
 
+    ftp_sequence = 0
+    ftp_session = 1
+    ftp_serializer: FileTransferProtocolPayloadSerializer
+    ftp_write_file_name: string = ""
+
     constructor(private main: Main) {
         for (const message of Object.values(REGISTRY)) {
             registerCustomMessageMagicNumber((message as MavLinkDataConstructor<MavLinkData>).MSG_ID.toString(),
                 (message as MavLinkDataConstructor<MavLinkData>).MAGIC_NUMBER)
         }
         this.mavlink_protocol = new MavLinkProtocolV2(this.SYS_ID, this.COMP_ID)
+        this.ftp_serializer = new FileTransferProtocolPayloadSerializer()
     }
 
     async init() {
@@ -184,7 +194,9 @@ export default class MavlinkController {
             this.main.data_controller.params.radio_rxerrors = data.rxerrors
             this.main.data_controller.params.radio_fixed = data.fixed
             await this.send(data)
-        } else {
+        } else if (data instanceof common.FileTransferProtocol) {
+            await this.onFTPEvent(data)
+        }else {
             await this.main.logs_controller.warning('Received packet:' + data.toString())
         }
     }
@@ -331,6 +343,59 @@ export default class MavlinkController {
         } catch (e) {
             this.main.logs_controller.error("Error when creating msg:", e)
             return null
+        }
+    }
+
+    ftpPayload(
+        opcode: common.MavFtpOpcode,
+        data: Uint8Array | string | number = new Uint8Array(0),
+        offset = 0
+    ): common.FileTransferProtocol {
+        const result: common.FileTransferProtocol = new common.FileTransferProtocol()
+        result.targetNetwork = 0
+        result.targetSystem = 1
+        result.targetComponent = 1
+
+        result.payload = [...this.ftp_serializer.serialize({
+            seq: this.ftp_sequence,
+            session: this.ftp_session,
+            opcode,
+            size: typeof data === 'number' ? data : data.length,
+            burstComplete: 0,
+            data: typeof data === 'string' ? new TextEncoder().encode(data) : typeof data === 'number' ? new Uint8Array(0) : data,
+            offset
+        })]
+
+        return result
+    }
+
+    async onFTPEvent(data: common.FileTransferProtocol) {
+        const payload = this.ftp_serializer.deserialize(Buffer.from(data.payload))
+        this.ftp_sequence = payload.seq
+
+        if (payload.opcode == MavFtpOpcode.CREATEFILE) {
+            const textDecoder = new TextDecoder()
+            this.ftp_write_file_name = path.join("data", textDecoder.decode(payload.data))
+            const directory = path.dirname(this.ftp_write_file_name)
+            if (!fs.existsSync(directory)) {
+                fs.mkdirSync(directory)
+            } else if (fs.existsSync(this.ftp_write_file_name)) {
+                fs.unlinkSync(this.ftp_write_file_name)
+            }
+            this.ftp_session = Math.round(Math.random()*255)
+            await this.send(this.ftpPayload(MavFtpOpcode.ACK))
+        } else if (payload.opcode == MavFtpOpcode.WRITEFILE) {
+            if (this.ftp_write_file_name && payload.session == this.ftp_session) {
+                fs.appendFileSync(this.ftp_write_file_name, payload.data)
+                await this.send(this.ftpPayload(MavFtpOpcode.ACK))
+            }
+        } else if (payload.opcode == MavFtpOpcode.TERMINATESESSION) {
+            if (payload.session == this.ftp_session) {
+                this.ftp_session = 0
+                await this.send(this.ftpPayload(MavFtpOpcode.ACK))
+                await this.main.handleNewFirmware(this.ftp_write_file_name)
+                this.ftp_write_file_name = ""
+            }
         }
     }
 }

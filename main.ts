@@ -13,6 +13,8 @@ import {configDotenv} from "dotenv";
 import HILController from "./src/controllers/hil_controller.js";
 import {DrivingMode} from "mavlink-lib/dist/lfs.js";
 import {waitFor} from "node-mavlink";
+import {exec} from "node:child_process";
+import AdmZip from "adm-zip";
 
 configDotenv()
 
@@ -190,6 +192,25 @@ export default class Main {
                 this.digital_outputs_controller.setForwardSwitch(false)
                 this.digital_outputs_controller.setReverseSwitch(true)
             }
+        }
+    }
+
+    async handleNewFirmware(file_name: string) {
+        const zip = new AdmZip(file_name)
+        const test_result = zip.test()
+        if (test_result) {
+            await this.logs_controller.info("Testing firmware passed!")
+            await this.logs_controller.info("Extracting files..")
+            await zip.extractAllToAsync("./")
+            await this.logs_controller.info("Done!")
+            const results = await import("package.json")
+            await this.logs_controller.info("New version: " + results.version)
+            if (this.in_production) {
+                await this.logs_controller.info("Rebooting system..")
+                exec('sudo /sbin/shutdown -r now');
+            }
+        } else {
+            await this.logs_controller.error("Firmware did not pass testing, maybe it is corrupt")
         }
     }
 }
