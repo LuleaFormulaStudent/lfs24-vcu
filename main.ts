@@ -203,7 +203,7 @@ export default class Main {
             await this.logs_controller.info("Extracting files..")
             await zip.extractAllToAsync("./")
             await this.logs_controller.info("Done!")
-            const results = await import("package.json")
+            const results = await import("./package.json")
             await this.logs_controller.info("New version: " + results.version)
             if (this.in_production) {
                 await this.logs_controller.info("Rebooting system..")
