@@ -197,25 +197,29 @@ export default class Main {
     }
 
     async handleNewFirmware(file_name: string) {
-        const zip = new AdmZip(file_name)
-        const test_result = zip.test()
-        if (test_result) {
-            await this.logs_controller.info("Testing firmware passed!")
-            await this.logs_controller.info("Extracting files..")
-            if (fs.existsSync("./source")) {
-                await zip.extractAllToAsync("./source")
-            } else {
-                await this.logs_controller.error("Source folder does not exists!")
-            }
-            await this.logs_controller.info("Done!")
-            const results = await import("./package.json")
-            await this.logs_controller.info("New version: " + results.version)
-            if (this.in_production) {
+        try {
+            const zip = new AdmZip(file_name)
+            const test_result = zip.test()
+            if (test_result) {
+                await this.logs_controller.info("Testing firmware passed!")
+                await this.logs_controller.info("Extracting files..")
+                if (fs.existsSync("./source")) {
+                    await zip.extractAllToAsync("./source")
+                } else {
+                    await this.logs_controller.error("Source folder does not exists! Skipping extracting")
+                }
+                await this.logs_controller.info("Done!")
+                const new_package_info = (await import("./package.json", {assert: { type: "json" }})).default
+                console.log(new_package_info)
+                await this.logs_controller.info("New version: " + new_package_info.version)
                 await this.logs_controller.info("Rebooting system..")
-                //exec('sudo /sbin/shutdown -r now');
+                exec('sudo /sbin/shutdown -r now');
+            } else {
+                await this.logs_controller.error("Firmware did not pass testing, maybe it is corrupt")
             }
-        } else {
-            await this.logs_controller.error("Firmware did not pass testing, maybe it is corrupt")
+        } catch (e) {
+            console.log(e)
+            await this.logs_controller.error("Problem parsing zip, maybe it is corrupt")
         }
     }
 }

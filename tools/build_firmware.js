@@ -12,6 +12,7 @@ async function run() {
         const excludes = fs.readFileSync(".dockerignore", {encoding: "utf-8"})
             .split("\n")
             .map((line) => line.trim())
+        excludes.push("dist")
 
         fs.readdirSync("./")
             .filter((file) => !excludes.includes(file))

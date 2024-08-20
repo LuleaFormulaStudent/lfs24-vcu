@@ -29,8 +29,9 @@ import {
 import {sleep} from "../helper_functions.js";
 import {BrakeData, ComputerStatus, REGISTRY, ThrottleData, VehicleData} from "mavlink-lib/dist/lfs.js"
 import fs from "fs";
+import fsPromises from "fs/promises"
 import path from "path";
-import AdmZip from "adm-zip"
+import {FileHandle} from "node:fs/promises";
 
 export default class MavlinkController {
 
@@ -56,6 +57,7 @@ export default class MavlinkController {
     ftp_session = 1
     ftp_serializer: FileTransferProtocolPayloadSerializer
     ftp_write_file_name: string = ""
+    ftp_file_handler: FileHandle | null = null
 
     constructor(private main: Main) {
         for (const message of Object.values(REGISTRY)) {
@@ -142,7 +144,11 @@ export default class MavlinkController {
         if (this.port_ready) {
             if (msg instanceof MavLinkData) {
                 try {
-                    await send(<Writable>this.port, msg, this.mavlink_protocol)
+                    if (this.ftp_write_file_name != "" && (msg instanceof common.FileTransferProtocol || msg instanceof common.StatusText)) {
+                        await send(<Writable>this.port, msg, this.mavlink_protocol)
+                    } else if (this.ftp_write_file_name == "") {
+                        await send(<Writable>this.port, msg, this.mavlink_protocol)
+                    }
                     return true
                 } catch (e) {
                     await this.main.logs_controller.error("Error when sending msg (" + msg.constructor.name + "): ", e)
@@ -375,24 +381,31 @@ export default class MavlinkController {
 
         if (payload.opcode == MavFtpOpcode.CREATEFILE) {
             const textDecoder = new TextDecoder()
-            this.ftp_write_file_name = path.join("data", textDecoder.decode(payload.data))
+            const file_name = textDecoder.decode(payload.data)
+            await this.main.logs_controller.info("Got request for upload file: " + file_name)
+            this.ftp_write_file_name = path.join("data", file_name)
             const directory = path.dirname(this.ftp_write_file_name)
             if (!fs.existsSync(directory)) {
                 fs.mkdirSync(directory)
             } else if (fs.existsSync(this.ftp_write_file_name)) {
+                await this.main.logs_controller.info("Removing old firmware file..")
                 fs.unlinkSync(this.ftp_write_file_name)
             }
+            this.ftp_file_handler = await fsPromises.open(this.ftp_write_file_name, "w+");
             this.ftp_session = Math.round(Math.random()*255)
             await this.send(this.ftpPayload(MavFtpOpcode.ACK))
         } else if (payload.opcode == MavFtpOpcode.WRITEFILE) {
-            if (this.ftp_write_file_name && payload.session == this.ftp_session) {
+            if (this.ftp_write_file_name && this.ftp_file_handler && payload.session == this.ftp_session) {
                 fs.appendFileSync(this.ftp_write_file_name, payload.data)
+                await this.ftp_file_handler.write(payload.data, 0, payload.data.length, payload.offset);
                 await this.send(this.ftpPayload(MavFtpOpcode.ACK))
             }
         } else if (payload.opcode == MavFtpOpcode.TERMINATESESSION) {
             if (payload.session == this.ftp_session) {
                 this.ftp_session = 0
+                await this.main.logs_controller.info("Terminating FTP session.")
                 await this.send(this.ftpPayload(MavFtpOpcode.ACK))
+                this.ftp_file_handler?.close()
                 await this.main.handleNewFirmware(this.ftp_write_file_name)
                 this.ftp_write_file_name = ""
             }
