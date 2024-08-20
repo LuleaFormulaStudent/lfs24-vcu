@@ -4,7 +4,6 @@ data
 package-lock.json
 README.md
 .idea
-dist
 .git
 lfs24-vcu.iml
 .gitignore
