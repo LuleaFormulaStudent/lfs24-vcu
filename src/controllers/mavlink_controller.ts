@@ -33,7 +33,8 @@ import fs from "fs";
 import fsPromises from "fs/promises"
 import path from "path";
 import {FileHandle} from "node:fs/promises";
-import {createRawChannel, Message} from "socketcan"
+import CanDriver from "../../libs/can_driver";
+
 
 const UINT8_MAX = 2**8-1
 
@@ -64,7 +65,7 @@ export default class MavlinkController {
     ftp_write_file_name: string = ""
     ftp_file_handler: FileHandle | null = null
 
-    can_channel: any
+    can_driver: CanDriver
 
     constructor(private main: Main) {
         for (const message of Object.values(REGISTRY)) {
@@ -80,17 +81,21 @@ export default class MavlinkController {
 
         if (this.main.in_production) {
             this.port = new SerialPort({path: "/dev/ttyAMA2", baudRate: 57600});
-
-
         } else {
             this.port = connect({host: '0.0.0.0', port: 5432})
         }
 
-        this.can_channel = createRawChannel("can0")
-        this.can_channel.addListener("onMessage", (msg: Message) => {
-            console.log(msg)
-        });
-        this.can_channel.start()
+        this.can_driver = new CanDriver()
+        this.can_driver
+            .pipe(new MavLinkPacketSplitter())
+            .pipe(new MavLinkPacketParser())
+            .on("data", (packet) => {
+                const clazz: MavLinkDataConstructor<MavLinkData> = this.REGISTRY[packet.header.msgid]
+                if (clazz) {
+                    const packet_data = packet.protocol.data(packet.payload, clazz)
+                    console.log(packet_data)
+                }
+            })
 
         this.ftp = new MavFTP(<Writable>this.port, {protocol: this.mavlink_protocol})
         this.heartbeat = new Heartbeat(<Writable>this.port, {protocol: this.mavlink_protocol})
