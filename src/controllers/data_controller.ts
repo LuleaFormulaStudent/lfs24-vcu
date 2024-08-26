@@ -11,6 +11,7 @@ import {GpsFixType} from "mavlink-mappings/dist/lib/common.js";
 import LSM6DS032 from "../../libs/LSM6DS032/LSM6DS032.js";
 import SystemInfo, {SystemInfoData} from "../../libs/system_info/system_info.js";
 import GPSDriver, {GGAQuality} from "../../libs/gps/gps_driver.js";
+import INA260 from "../../libs/ina260/ina260.js";
 
 export const INT16_MAX = 2 ** 15 - 1
 export const INT32_MAX = 2 ** 31 - 1
@@ -21,6 +22,7 @@ export default class DataController extends ParamsHandler {
     co_mcu: VCUCoMcu | null = null
     gps: GPSDriver | null = null
     imu: LSM6DS032 | null = null
+    ina: INA260 | null = null
     system_info: SystemInfo
 
     inlfuxdb_client: WriteApi
@@ -30,6 +32,11 @@ export default class DataController extends ParamsHandler {
 
     last_imu_update: number = 0
     previous_imu_lon_speed: number = 0
+
+    last_ina_update: number = 0
+    previous_ina_current: number = 0
+
+    history_points_cache: Point[] = []
 
     constructor(private main: Main) {
         super({
@@ -42,14 +49,14 @@ export default class DataController extends ParamsHandler {
             throttle_output: 0,
             throttle_raw_max: 255,
             throttle_raw_min: 0,
+            throttle_max_val: 1,
             throttle_dz: 0,
-            throttle_max_val: 0.5,
             brake_raw: 0,
             brake_input: 0,
             brake_output: 0,
             brake_raw_max: 255,
             brake_raw_min: 0,
-            brake_max_val: 0.5,
+            brake_max_val: 1,
             brake_dz: 0,
             brake_light_act: 0.05,
             foot_switch_act: 0.05,
@@ -67,7 +74,7 @@ export default class DataController extends ParamsHandler {
             vehicle_power: 0,
             vehicle_heading: 0,
             vehicle_steering: 0,
-            gps_rime: 0,
+            gps_time: 0,
             gps_speed: 0,
             gps_longitude: 0,
             gps_latitude: 0,
@@ -94,10 +101,11 @@ export default class DataController extends ParamsHandler {
             lv_cons_cap: 0,
             lv_cons_energy: 0,
             lv_max_voltage: 3.45 * 4,
-            lv_cur_voltage: 14,
+            lv_cur_voltage: 0,
             lv_max_amp: 15,
-            lv_cur_amp: 14,
-            lv_cur_temp: 20,
+            lv_cur_amp: 0,
+            lv_cur_temp: 0,
+            lv_cur_power: 20,
             hv_bdi: 1,
             hv_max_energy: 5018, //3.45 * 55 * 32,
             hv_cons_cap: 0,
@@ -260,6 +268,7 @@ export default class DataController extends ParamsHandler {
             this.co_mcu = new VCUCoMcu()
             //this.ads = new ADS1115()
             this.imu = new LSM6DS032()
+            this.ina = new INA260()
         }
 
         const inlfuxdb = new InfluxDB({
@@ -278,11 +287,19 @@ export default class DataController extends ParamsHandler {
             this.main.logs_controller.error("Error with data:", err)
         })
 
-        this.on("change", ({param, value}) => {
+        setInterval(() => {
+            if (this.history_points_cache.length) {
+                this.inlfuxdb_client.writePoints(this.history_points_cache)
+                this.inlfuxdb_client.flush()
+                this.history_points_cache = []
+            }
+        }, 100)
+
+        this.on("change", ({param, value, timestamp}) => {
             if (this.main.data_controller.params.system_state == MavState.ACTIVE) {
                 let point = new Point(this.measurement_name)
                     .tag('type', 'param')
-                    .timestamp("")
+                    .timestamp(timestamp) // TODO: Change to use GPS time
                 if (typeof value == "string") {
                     point.stringField(param, value)
                 } else if (typeof value == "number") {
@@ -290,8 +307,7 @@ export default class DataController extends ParamsHandler {
                 } else if (typeof value == "boolean") {
                     point.booleanField(param, value)
                 }
-                this.inlfuxdb_client.writePoints([point])
-                this.inlfuxdb_client.flush()
+                this.history_points_cache.push(point)
             }
         })
 
@@ -327,9 +343,11 @@ export default class DataController extends ParamsHandler {
                 this.params.steering_raw = data[2]
                 this.params.board_temp = (data[3] - 100) / 10
 
-                if (!this.main.isInSystemMode(MavModeFlag.TEST_ENABLED) && !this.main.isInSystemMode(MavModeFlag.HIL_ENABLED)) {
-                    this.params.throttle_input = map_range(this.params.throttle_raw, this.params.throttle_raw_min, this.params.throttle_raw_max, 0, 1)
-                    this.params.brake_input = map_range(this.params.brake_raw, this.params.brake_raw_min, this.params.brake_raw_max, 0, 1)
+                if (!this.main.isInSystemMode(MavModeFlag.HIL_ENABLED)) {
+                    const throttle_normalized = map_range(this.params.throttle_raw, this.params.throttle_raw_min, this.params.throttle_raw_max, 0, 1)
+                    this.params.throttle_input = map_range(Math.max(throttle_normalized, this.main.data_controller.params.throttle_dz), this.main.data_controller.params.throttle_dz, 1, 0, 1)
+                    const brake_normalized = map_range(this.params.brake_raw, this.params.brake_raw_min, this.params.brake_raw_max, 0, 1)
+                    this.params.brake_input =  map_range(Math.max(brake_normalized, this.main.data_controller.params.brake_dz), this.main.data_controller.params.brake_dz, 1, 0, 1)
                 }
             })
 
@@ -339,13 +357,13 @@ export default class DataController extends ParamsHandler {
                 } else if (this.params.system_state == MavState.ACTIVE && ts_active == 0) {
                     this.main.setSystemState(MavState.STANDBY)
                     if (this.params.ts_active_out) {
-                        this.main.onUnexpectedTSShutdown()
+                        this.main.traction_system_controller.onUnexpectedTSShutdown()
                     }
                 }
             })
 
             this.co_mcu.on("ind_sensors", (data) => {
-                [this.params.ind_1_raw_freq, this.params.ind_2_raw_freq, this.params.ind_2_raw_freq] = data
+                [this.params.ind_3_raw_freq, this.params.ind_2_raw_freq, this.params.ind_1_raw_freq] = data
                 this.params.fl_wheel_speed = this.params.ind_1_raw_freq * this.params.front_wheel_rad * this.FREQ_TO_VELOCITY_CONST
                 this.params.fr_wheel_speed = this.params.ind_2_raw_freq * this.params.front_wheel_rad * this.FREQ_TO_VELOCITY_CONST
                 this.params.rear_axle_speed = this.params.ind_3_raw_freq * this.params.rear_wheel_rad * this.FREQ_TO_VELOCITY_CONST
@@ -358,7 +376,7 @@ export default class DataController extends ParamsHandler {
         if (this.gps) {
             this.gps.on("data", (data: any) => {
                 if (data.hasOwnProperty("time")) {
-                    this.params.gps_latitude = (data.time as Date).getTime()
+                    this.params.gps_time = (data.time as Date).getTime()
                 }
                 if (data.hasOwnProperty("lat") && data.hasOwnProperty("lon")) {
                     this.params.gps_latitude = data.lat
@@ -431,6 +449,24 @@ export default class DataController extends ParamsHandler {
             })
         }
 
+        if (this.ina && !this.main.isInSystemMode(MavModeFlag.HIL_ENABLED)) {
+            this.ina.on("error", (err) => this.main.logs_controller.error("INA260 Error:", err))
+            this.ina.on("data", (data) => {
+                this.params.lv_cur_power = data[0]
+                this.params.lv_cur_voltage = data[1]
+                this.params.lv_cur_amp = data[2]
+
+                const current_time = this.main.uptime
+                if (this.last_ina_update > 0) {
+                    this.params.lv_cons_cap += (current_time - this.last_ina_update) * (this.previous_ina_current + this.params.lv_cur_amp) / (1000 * 2)
+                    this.previous_ina_current = this.params.lv_cur_amp
+                }
+                this.last_imu_update = current_time
+            })
+
+            this.ina.startPoll(20)
+        }
+
         this.system_info.on("data", (data: SystemInfoData) => {
             this.params.cpu_cores = data.cpu.usage
             this.params.cpu_temp = data.cpu.temp
@@ -459,22 +495,28 @@ export default class DataController extends ParamsHandler {
     }
 
     calculateVehicleSpeed() {
-        const speeds = [this.params.fl_wheel_speed, this.params.fr_wheel_speed, this.params.rear_axle_speed]
-
-        if (this.params.gps_speed > 1) {
-            speeds.push(this.params.gps_speed)
-        }
-
-        if (this.params.imu_lon_speed > 1) {
-            //speeds.push(this.params.imu_lon_speed)
-        }
+        let speeds_used = 0
+        const speeds = [
+            this.params.fl_wheel_speed*3.6,
+            this.params.fr_wheel_speed*3.6,
+            this.params.rear_axle_speed*3.6,
+            //this.params.imu_lon_speed*3.6
+        ]
 
         let vehicle_speed = 0
         for (let i = 0; i < speeds.length; i++) {
-            vehicle_speed += speeds[i]
+            if (speeds[i] > 1){
+                vehicle_speed += speeds[i]
+                speeds_used++
+            }
         }
 
-        //console.log(this.params.fl_wheel_speed, this.params.fr_wheel_speed, this.params.rear_axle_speed, this.params.gps_speed, this.params.imu_lon_speed)
-        this.params.vehicle_speed = Math.round(vehicle_speed * 3.6 / speeds.length)
+        /*if (this.params.gps_speed > 1) {
+            vehicle_speed += this.params.gps_speed
+            speeds_used++
+        }*/
+
+        //console.log(this.params.fl_wheel_speed, this.params.fr_wheel_speed, this.params.rear_axle_speed, this.params.gps_speed), //this.params.imu_lon_speed)
+        this.params.vehicle_speed = Math.round(vehicle_speed / speeds_used)
     }
 }

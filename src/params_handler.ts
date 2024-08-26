@@ -1,9 +1,12 @@
 import EventEmitter from "node:events";
+import {LocalStorage} from "node-localstorage";
 
 export default class ParamsHandler extends EventEmitter {
 
     events: { [propName: string]: EventEmitter } = {}
     params: any = {}
+
+    storage = new LocalStorage("./data/params/")
 
     constructor(params = {}, params_settings: {[propName: string]: {min?: number, max?: number}} = {}) {
         super()
@@ -19,22 +22,24 @@ export default class ParamsHandler extends EventEmitter {
                 set(value) {
                     if (this.__params_settings.hasOwnProperty(param)) {
                         if (this.__params_settings[param].hasOwnProperty("min") && value < this.__params_settings[param].min) {
-                            this.__this.emit("error", {error: "min", msg: "Error! Min value triggered!", param, value})
+                            this.__this.emit("error", {error: "min", msg: "Error! Min value triggered!", param, value, timestamp: Date.now()})
                         } else if (this.__params_settings[param].hasOwnProperty("max") && value > this.__params_settings[param].max) {
-                            this.__this.emit("error", {error: "max", msg: "Error! Max value triggered!", param, value})
+                            this.__this.emit("error", {error: "max", msg: "Error! Max value triggered!", param, value, timestamp: Date.now()})
                         } else {
                             this["_" + param] = value
                             if (this.__this.events.hasOwnProperty(param)) {
-                                this.__this.events[param].emit("change", ({param, value}))
+                                this.__this.events[param].emit("change", ({param, value, timestamp: Date.now()}))
                             }
-                            this.__this.emit("change", ({param, value}))
+                            this.__this.emit("change", ({param, value, timestamp: Date.now()}))
+                            this.__this.storage.setItem(param, value)
                         }
                     } else {
                         this["_" + param] = value
                         if (this.__this.events.hasOwnProperty(param)) {
-                            this.__this.events[param].emit("change", ({param, value}))
+                            this.__this.events[param].emit("change", ({param, value, timestamp: Date.now()}))
                         }
-                        this.__this.emit("change", ({param, value}))
+                        this.__this.emit("change", ({param, value, timestamp: Date.now()}))
+                        this.__this.storage.setItem(param, value)
                     }
                 },
                 get(): any {
@@ -43,7 +48,7 @@ export default class ParamsHandler extends EventEmitter {
             });
         }
         for (const [key, val] of Object.entries(params)) {
-            this.params[key] = val
+            this.params[key] = this.storage.getItem(key) || val
         }
     }
 

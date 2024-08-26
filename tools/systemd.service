@@ -1,0 +1,14 @@
+[Unit]
+Description=Main system
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+WorkingDirectory=/home/lfs/lfs-vcu
+ExecStart=/bin/bash -c "docker compose up -d --remove-orphans"
+ExecStop=/bin/bash -c "docker compose stop"
+
+[Install]
+WantedBy=multi-user.target

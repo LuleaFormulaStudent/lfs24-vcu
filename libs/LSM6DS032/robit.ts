@@ -1,6 +1,6 @@
 import {I2CBus} from "i2c-bus";
 
-export default class RWBit {
+export default class ROBit {
 
     bit_mask: number
     byte: number
@@ -18,17 +18,6 @@ export default class RWBit {
         const buf = Buffer.alloc(1)
         this.i2c.readI2cBlockSync(this.i2c_adress, this.register_address, buf.length, buf)
         return (buf[this.byte] & this.bit_mask) == this.bit_mask
-    }
-
-    set val(value: boolean) {
-        const buf = Buffer.alloc(1)
-        this.i2c.readI2cBlockSync(this.i2c_adress, this.register_address, buf.length, buf)
-        if (value) {
-            buf[this.byte] |= this.bit_mask
-        } else {
-            buf[this.byte] &= ~this.bit_mask
-        }
-        this.i2c.i2cWriteSync(this.i2c_adress, buf.length, buf)
     }
 
 }

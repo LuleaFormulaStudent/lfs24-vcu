@@ -24,14 +24,17 @@ import {
     MavBatteryMode,
     MavBatteryType,
     MavFtpOpcode,
-    MavParamType
+    MavParamType,
+    MavResult
 } from "mavlink-mappings/dist/lib/common.js";
 import {sleep} from "../helper_functions.js";
-import {BrakeData, ComputerStatus, REGISTRY, ThrottleData, VehicleData} from "mavlink-lib/dist/lfs.js"
+import {BrakeData, ComputerStatus, DrivingMode, REGISTRY, ThrottleData, VehicleData} from "mavlink-lib/dist/lfs.js"
 import fs from "fs";
 import fsPromises from "fs/promises"
 import path from "path";
 import {FileHandle} from "node:fs/promises";
+
+const UINT8_MAX = 2**8-1
 
 export default class MavlinkController {
 
@@ -50,6 +53,7 @@ export default class MavlinkController {
 
     port_ready = false
 
+    send_mav_messages = false
     mav_messages_interval_times: { [propName: number]: number } = {}
     mav_messages_intervals: { [propName: number]: any } = {}
 
@@ -97,6 +101,10 @@ export default class MavlinkController {
                         if (clazz) {
                             const packet_data = packet.protocol.data(packet.payload, clazz)
                             //@ts-ignore
+                            if (packet.protocol.hasOwnProperty("sysid") && packet.protocol["sysid"] == 254) {
+                                this.send_mav_messages = true
+                            }
+                            //@ts-ignore
                             if (packet_data.hasOwnProperty("targetSystem") && packet_data["targetSystem"]! == this.SYS_ID && packet_data.hasOwnProperty("targetComponent") && packet_data["targetComponent"] == this.COMP_ID) {
                                 await this.handle_packet(packet_data)
                             } else {
@@ -131,6 +139,12 @@ export default class MavlinkController {
         this.heartbeat!.start()
         this.port_ready = true
 
+        if (this.send_mav_messages) {
+            this.setupMAVMessages()
+        }
+    }
+
+    setupMAVMessages() {
         this.createMsgInterval(common.BatteryStatus.MSG_ID, 500)
         this.createMsgInterval(VehicleData.MSG_ID, 100)
         this.createMsgInterval(ThrottleData.MSG_ID, 100)
@@ -157,7 +171,6 @@ export default class MavlinkController {
             } else {
                 for (const m of msg) {
                     try {
-
                         await this.send(m)
                         await sleep(wait_time)
                     } catch (e) {
@@ -169,6 +182,16 @@ export default class MavlinkController {
             return true
         }
         return false
+    }
+
+    async sendCmdAck(command: common.MavCmd, result: MavResult, progress: number = UINT8_MAX, targetSystem = 254, targetComponent = 1) {
+        const msg = new common.CommandAck()
+        msg.targetSystem = targetSystem
+        msg.targetComponent = targetComponent
+        msg.result = result
+        msg.command = command
+        msg.progress = progress
+        await this.send(msg)
     }
 
     async handle_packet(data: MavLinkData) {
@@ -184,13 +207,24 @@ export default class MavlinkController {
             try {
                 this.main.data_controller.params[data.paramId] = data.paramValue
                 await this.send(this.create_param_msg(data.paramId, 0))
+                await this.main.logs_controller.info("Setting parameter: " + data.paramId + " = " + data.paramValue)
             } catch (e: any) {
-                await this.main.logs_controller.error("Error setting parameter: " + data.paramId + " = " + data.paramValue + ". " + e.toString())
+                await this.main.logs_controller.error("Error setting parameter: (" + data.paramId + " = " + data.paramValue + "). " + e.toString())
             }
         } else if (data instanceof common.LogRequestList) {
             await this.main.logs_controller.onLogListRequest(data.start, data.end)
         } else if (data instanceof common.CommandLong && data.command == common.MavCmd.SET_MESSAGE_INTERVAL) {
             this.createMsgInterval(data._param1, data._param2)
+        } else if (data instanceof common.CommandLong && data.command == common.MavCmd.DO_MOTOR_TEST) {
+            if (data._param2 == common.MotorTestThrottleType.THROTTLE_PERCENT) {
+                if (data._param3 == 0) {
+                    await this.main.traction_system_controller.abortMotorTest()
+                } else  {
+                    await this.main.traction_system_controller.doMotorTest(data._param3 / 100, data._param3 > 0? DrivingMode.FORWARD: DrivingMode.REVERSE, data._param4*1000)
+                }
+            } else {
+                await this.sendCmdAck(common.MavCmd.DO_MOTOR_TEST, MavResult.UNSUPPORTED)
+            }
         } else if (data instanceof common.RadioStatus) {
             this.main.data_controller.params.radio_rssi = data.rssi
             this.main.data_controller.params.radio_remrssi = data.remrssi
@@ -232,9 +266,11 @@ export default class MavlinkController {
 
     createMsgInterval(msg_id: number, interval: number) {
         this.mav_messages_intervals[msg_id] = setInterval(async () => {
-            const msg = this.createFromMsgID(msg_id)
-            if (msg) {
-                await this.send(msg)
+            if (this.send_mav_messages) {
+                const msg = this.createFromMsgID(msg_id)
+                if (msg) {
+                    await this.send(msg)
+                }
             }
         }, interval)
         this.mav_messages_interval_times[msg_id] = interval
@@ -276,6 +312,7 @@ export default class MavlinkController {
                 }
                 case common.GpsRawInt.MSG_ID: {
                     const gps_msg = new common.GpsRawInt()
+                    gps_msg.timeUsec = BigInt(this.main.data_controller.params.gps_time)
                     gps_msg.alt = this.main.data_controller.params.gps_altitude * 1000
                     gps_msg.eph = this.main.data_controller.params.gps_hdop * 100
                     gps_msg.lon = this.main.data_controller.params.gps_longitude * 10 ** 7

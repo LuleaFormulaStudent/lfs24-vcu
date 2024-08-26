@@ -2,7 +2,7 @@ services:
     database:
         container_name: influxdb
         image: influxdb
-        restart: on-failure
+        restart: no
         networks:
             - lfs-network
         env_file: ./.env
@@ -17,14 +17,25 @@ services:
             interval: 5s
             retries: 100
 
+    redis:
+        image: redis:bookworm
+        restart: no
+        ports:
+            - "6379:6379"
+        networks:
+            - lfs-network
+        volumes:
+            - ./dаta/redis/data:/root/redis
+            - ./dаta/redis/redis.conf:/usr/local/etc/redis/redis.conf
+        env_file: ./.env
+
     lfs_vcu:
         container_name: lfs-vcu
         build: .
         command: "npm run prod"
         env_file: ./.env
         privileged: true
-        restart: on-failure
-
+        restart: no
         depends_on:
             database:
                 condition: service_healthy

@@ -28,7 +28,11 @@ export default class SteeringWheelController {
                     const [event, val] = Object.entries(data)[0];
                     if (event == "btn_p" && val == 3) {
                         this.driving_mode_forward_timeout = setTimeout(() => {
-                            this.main.setDrivingMode(1)
+                            if (this.main.data_controller.params.driving_mode == DrivingMode.NEUTRAL) {
+                                this.main.setDrivingMode(DrivingMode.FORWARD)
+                            } else {
+                                this.main.setDrivingMode(DrivingMode.NEUTRAL)
+                            }
                         }, 1000)
                     } else if (event == "btn_r" && val == 3) {
                         clearTimeout(this.driving_mode_forward_timeout)
@@ -47,9 +51,9 @@ export default class SteeringWheelController {
                     if (event == "btn_p" && val == 1) {
                         this.activate_ts_timeout = setTimeout(() => {
                             if (this.main.data_controller.params.system_state == MavState.ACTIVE) {
-                                this.main.deactivateTS()
+                                this.main.traction_system_controller.deactivateTS()
                             } else {
-                                this.main.activateTS()
+                                this.main.traction_system_controller.activateTS()
                             }
                         }, 2000)
                     } else if (event == "btn_r" && val == 2) {

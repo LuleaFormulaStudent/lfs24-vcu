@@ -1,9 +1,8 @@
 import StatusLed from "./src/controllers/status_led.js";
-import ThrottleController from "./src/controllers/throttle_controller.js";
+import TractionSystemController from "./src/controllers/traction_system_controller.js";
 import SteeringWheelController from "./src/controllers/steering_wheel_controller.js";
 import DataController from "./src/controllers/data_controller.js";
 import DigitalOutputsController from "./src/controllers/digital_outputs_controller.js";
-import BrakeController from "./src/controllers/brake_controller.js";
 import MavlinkController from "./src/controllers/mavlink_controller.js";
 import {MavModeFlag, MavState} from "mavlink-mappings/dist/lib/minimal.js";
 import {createServer, Server, Socket} from "node:net";
@@ -23,8 +22,7 @@ export default class Main {
 
     data_controller: DataController
     status_led: StatusLed
-    throttle_controller: ThrottleController
-    brake_controller: BrakeController
+    traction_system_controller: TractionSystemController
     steering_wheel_controller: SteeringWheelController
     digital_outputs_controller: DigitalOutputsController
     mavlink_controller: MavlinkController
@@ -43,9 +41,8 @@ export default class Main {
         this.logs_controller = new LogsController(this)
         this.data_controller = new DataController(this)
         this.status_led = new StatusLed(this)
-        this.throttle_controller = new ThrottleController(this)
+        this.traction_system_controller = new TractionSystemController(this)
         this.digital_outputs_controller = new DigitalOutputsController(this)
-        this.brake_controller = new BrakeController(this)
         this.steering_wheel_controller = new SteeringWheelController(this)
         this.mavlink_controller = new MavlinkController(this)
         this.hil_controller = new HILController(this)
@@ -101,14 +98,15 @@ export default class Main {
 
         await this.data_controller.init()
         await this.digital_outputs_controller.init()
-        await this.throttle_controller.init()
-        await this.brake_controller.init()
+        await this.traction_system_controller.init()
         await this.steering_wheel_controller.init()
         await this.hil_controller.init()
         await this.mavlink_controller.init()
 
         await this.logs_controller.info("Done initializing system!")
         await this.setSystemState(MavState.STANDBY)
+        this.status_led.setBlueLED(false)
+        this.status_led.setGreenLED(true)
     }
 
     async setSystemState(state: MavState) {
@@ -130,54 +128,6 @@ export default class Main {
 
     isInSystemMode(mode: MavModeFlag): boolean {
         return (this.data_controller.params.system_state & mode) != 0
-    }
-
-    async activateTS(): Promise<boolean> {
-        try {
-            if (this.isInSystemMode(MavModeFlag.HIL_ENABLED)) {
-                await this.logs_controller.warning("Cannot activate traction system when in HIL mode!")
-            }
-
-            if (this.data_controller.params.system_state != MavState.STANDBY) {
-                await this.logs_controller.info("System is not in standby mode")
-                return false
-            }
-
-            await this.logs_controller.info("Trying to activate traction system..")
-            this.digital_outputs_controller.setTSActiveRelay(true)
-
-            await waitFor(() => this.data_controller.params.system_state == MavState.ACTIVE, 5000, 100)
-            return true
-        } catch (e) {
-            if (e == "Timeout") {
-                this.digital_outputs_controller.setTSActiveRelay(false)
-                await this.logs_controller.error("Traction system did not activate in time!")
-            } else {
-                await this.logs_controller.error("Error occurred ")
-            }
-            return false
-        }
-    }
-
-    async deactivateTS(): Promise<boolean> {
-        try {
-            await this.logs_controller.info("Trying to activate TS")
-            this.digital_outputs_controller.setTSActiveRelay(false)
-            await waitFor(() => this.data_controller.params.system_state == MavState.STANDBY, 3000, 100)
-            return true
-        } catch (e) {
-            if (e == "Timeout") {
-                await this.logs_controller.error("Traction system did not deactivate in time!")
-            } else {
-                await this.logs_controller.error("Error occurred ")
-            }
-            return false
-        }
-    }
-
-    async onUnexpectedTSShutdown() {
-        this.setDrivingMode(DrivingMode.NEUTRAL)
-        await this.logs_controller.error("Traction system turned off, probably an error occurred!")
     }
 
     setDrivingMode(mode: DrivingMode) {
@@ -204,14 +154,14 @@ export default class Main {
                 await this.logs_controller.info("Testing firmware passed!")
                 await this.logs_controller.info("Extracting files..")
                 if (fs.existsSync("./source")) {
-                    await zip.extractAllToAsync("./source")
+                    await zip.extractAllToAsync("./source", true)
                 } else {
                     await this.logs_controller.error("Source folder does not exists! Skipping extracting")
                 }
                 await this.logs_controller.info("Done!")
-                const new_package_info = (await import("./package.json", {assert: { type: "json" }})).default
-                console.log(new_package_info)
-                await this.logs_controller.info("New version: " + new_package_info.version)
+                //const new_package_info = (await import("./package.json", {assert: { type: "json" }})).default
+                //console.log(new_package_info)
+                //await this.logs_controller.info("New version: " + new_package_info.version)
                 await this.logs_controller.info("Rebooting system..")
                 exec('sudo /sbin/shutdown -r now');
             } else {
@@ -226,5 +176,4 @@ export default class Main {
 
 (new Main().init())
 
-// Fixa Grön LED
 // Fixa Ouput 3 relay board

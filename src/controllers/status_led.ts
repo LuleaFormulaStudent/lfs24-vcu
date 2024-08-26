@@ -3,14 +3,14 @@ import Main from "../../main";
 
 export default class StatusLed {
 
-    red_led: Gpio | null
-    green_led: Gpio | null
-    blue_led: Gpio | null
+    private readonly red_led: Gpio | null
+    private readonly green_led: Gpio | null
+    private readonly blue_led: Gpio | null
 
     constructor(private main: Main) {
         if (this.main.in_production) {
             this.red_led = new Gpio(518, 'out');
-            this.green_led = new Gpio(531, 'out');
+            this.green_led = new Gpio(533, 'out');
             this.blue_led = new Gpio(538, 'out');
         } else {
             this.red_led = null

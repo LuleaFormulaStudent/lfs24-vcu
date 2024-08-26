@@ -1,9 +1,9 @@
 services:
-    influxdb:
+    database:
         container_name: influxdb-database
         image: influxdb
         restart: always
-        env_file: 
+        env_file:
             - .env
         ports:
             - "8086:8086"
@@ -15,3 +15,31 @@ services:
             timeout: 5s
             interval: 1m
             retries: 3
+
+    lfs_vcu:
+        container_name: lfs-vcu
+        build: .
+        command: "npm run prod"
+        env_file: ./.env
+        privileged: true
+        restart: no
+        depends_on:
+            database:
+                condition: service_healthy
+            redis:
+                condition: service_started
+        networks:
+            - lfs-network
+        ports:
+            - "5432:5432"
+            - "6000:6000"
+        volumes:
+            - ./data:/lfs-vcu/data
+            - ./:/lfs-vcu/source
+            - /var/run/docker.sock:/var/run/docker.sock
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
+
+networks:
+    lfs-network:
+        driver: bridge

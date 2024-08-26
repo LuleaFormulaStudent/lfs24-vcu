@@ -59,7 +59,7 @@ export default class DigitalOutputsController  {
     setTSActiveRelay(val: boolean) {
         this.main.data_controller.params.ts_active_out = val
         if (this.board) {
-            this.board.setOutput(3, val)
+            this.board.setOutput(2, val)
         }
     }
 }
