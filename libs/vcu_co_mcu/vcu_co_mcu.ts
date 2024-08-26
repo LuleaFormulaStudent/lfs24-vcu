@@ -1,4 +1,4 @@
-import {I2CBus} from "i2c-bus";
+import {I2CBus, openSync} from "i2c-bus";
 import os from "os";
 import EventEmitter from "node:events";
 import {sleep} from "node-mavlink";
@@ -12,15 +12,8 @@ export default class VCUCoMcu extends EventEmitter {
     constructor(private adress: number = 12, private bus_num: number = 1) {
         super()
         if (os.arch().startsWith("arm")) {
-            import("i2c-bus").then(async (i2c) => {
-                this.i2c_device = i2c.openSync(this.bus_num)
-                await sleep(10)
-                this.initialized = true
-                //const result = this.i2c_device.scanSync(adress)
-                /*if (!result.includes(adress)) {
-                    this.emit("error", "Co MCU is not found at adress, " + adress)
-                }*/
-            })
+            this.i2c_device = openSync(this.bus_num)
+            this.initialized = true
         }
     }
 

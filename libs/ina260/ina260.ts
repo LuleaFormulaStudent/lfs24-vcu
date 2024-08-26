@@ -1,4 +1,4 @@
-import {I2CBus} from "i2c-bus";
+import {I2CBus, openSync} from "i2c-bus";
 import ROUnaryStruct from "../LSM6DS032/ro_unary_struct.js";
 import RWBit from "../LSM6DS032/rwbit.js";
 import RWBits from "../LSM6DS032/rwbits.js";
@@ -91,51 +91,48 @@ export default class INA260 extends EventEmitter {
     constructor(adress: number = 0x40, bus_num: number = 1) {
         super();
         if (os.arch().startsWith("arm")) {
-            import("i2c-bus").then(async (i2c) => {
-                this.i2c_device = i2c.openSync(bus_num)
-                await sleep(10)
-                const result = this.i2c_device.scanSync(adress)
-                if (!result.includes(adress)) {
-                    this.emit("error", new Error("LSM6DS032 device not found at adress, " + adress))
-                    this.i2c_device = null
-                } else {
-                    this._raw_current = new ROUnaryStruct(this.i2c_device, adress, this._REG_CURRENT, ">h")
-                    this._raw_voltage = new ROUnaryStruct(this.i2c_device, adress, this._REG_BUS_VOLTAGE, ">H")
-                    this._raw_power = new ROUnaryStruct(this.i2c_device, adress, this._REG_POWER, ">H")
+            this.i2c_device = openSync(bus_num)
+            const result = this.i2c_device.scanSync(adress)
+            if (!result.includes(adress)) {
+                this.emit("error", new Error("LSM6DS032 device not found at adress, " + adress))
+                this.i2c_device = null
+            } else {
+                this._raw_current = new ROUnaryStruct(this.i2c_device, adress, this._REG_CURRENT, ">h")
+                this._raw_voltage = new ROUnaryStruct(this.i2c_device, adress, this._REG_BUS_VOLTAGE, ">H")
+                this._raw_power = new ROUnaryStruct(this.i2c_device, adress, this._REG_POWER, ">H")
 
-                    this.over_current_limit = new RWBit(this.i2c_device, adress, this._REG_MASK_ENABLE, 15, 2, false)
-                    this.under_current_limit = new RWBit(this.i2c_device, adress, this._REG_MASK_ENABLE, 14, 2, false)
-                    this.bus_voltage_over_voltage = new RWBit(this.i2c_device, adress, this._REG_MASK_ENABLE, 13, 2, false)
-                    this.bus_voltage_under_voltage = new RWBit(this.i2c_device, adress,this._REG_MASK_ENABLE, 12, 2, false)
-                    this.power_over_limit = new RWBit(this.i2c_device, adress, this._REG_MASK_ENABLE, 11, 2, false)
-                    this.conversion_ready = new RWBit(this.i2c_device, adress, this._REG_MASK_ENABLE, 10, 2, false)
-                    this.alert_function_flag = new ROBit(this.i2c_device, adress, this._REG_MASK_ENABLE, 4, 2, false)
-                    this._conversion_ready_flag = new ROBit(this.i2c_device, adress, this._REG_MASK_ENABLE, 3, 2, false)
-                    this.math_overflow_flag = new ROBit(this.i2c_device, adress, this._REG_MASK_ENABLE, 2, 2, false)
-                    this.alert_polarity_bit = new RWBit(this.i2c_device, adress, this._REG_MASK_ENABLE, 1, 2, false)
-                    this.alert_latch_enable = new RWBit(this.i2c_device, adress, this._REG_MASK_ENABLE, 0, 2, false)
-                    this.reset_bit = new RWBit(this.i2c_device, adress, this._REG_CONFIG, 15, 2, false)
-                    this.averaging_count = new RWBits(this.i2c_device, adress, 3, this._REG_CONFIG, 9, 2, false)
-                    this.voltage_conversion_time = new RWBits(this.i2c_device, adress, 3, this._REG_CONFIG, 6, 2, false)
-                    this.current_conversion_time = new RWBits(this.i2c_device, adress, 3, this._REG_CONFIG, 3, 2, false)
-                    this.mode = new RWBits(this.i2c_device, adress, 3, this._REG_CONFIG, 0, 2, false)
-                    this.mask_enable = new RWBits(this.i2c_device, adress, 16, this._REG_MASK_ENABLE, 0, 2, false)
-                    this.alert_limit = new RWBits(this.i2c_device, adress, 16, this._REG_ALERT_LIMIT, 0, 2, false)
-                    this._manufacturer_id = new ROUnaryStruct(this.i2c_device, adress, this._REG_MFG_UID, ">H")
-                    this._device_id = new ROBits(this.i2c_device, adress, 12, this._REG_DIE_UID, 4, 2, false)
-                    this.revision_id = new ROBits(this.i2c_device, adress, 4, this._REG_DIE_UID, 0, 2, false)
+                this.over_current_limit = new RWBit(this.i2c_device, adress, this._REG_MASK_ENABLE, 15, 2, false)
+                this.under_current_limit = new RWBit(this.i2c_device, adress, this._REG_MASK_ENABLE, 14, 2, false)
+                this.bus_voltage_over_voltage = new RWBit(this.i2c_device, adress, this._REG_MASK_ENABLE, 13, 2, false)
+                this.bus_voltage_under_voltage = new RWBit(this.i2c_device, adress, this._REG_MASK_ENABLE, 12, 2, false)
+                this.power_over_limit = new RWBit(this.i2c_device, adress, this._REG_MASK_ENABLE, 11, 2, false)
+                this.conversion_ready = new RWBit(this.i2c_device, adress, this._REG_MASK_ENABLE, 10, 2, false)
+                this.alert_function_flag = new ROBit(this.i2c_device, adress, this._REG_MASK_ENABLE, 4, 2, false)
+                this._conversion_ready_flag = new ROBit(this.i2c_device, adress, this._REG_MASK_ENABLE, 3, 2, false)
+                this.math_overflow_flag = new ROBit(this.i2c_device, adress, this._REG_MASK_ENABLE, 2, 2, false)
+                this.alert_polarity_bit = new RWBit(this.i2c_device, adress, this._REG_MASK_ENABLE, 1, 2, false)
+                this.alert_latch_enable = new RWBit(this.i2c_device, adress, this._REG_MASK_ENABLE, 0, 2, false)
+                this.reset_bit = new RWBit(this.i2c_device, adress, this._REG_CONFIG, 15, 2, false)
+                this.averaging_count = new RWBits(this.i2c_device, adress, 3, this._REG_CONFIG, 9, 2, false)
+                this.voltage_conversion_time = new RWBits(this.i2c_device, adress, 3, this._REG_CONFIG, 6, 2, false)
+                this.current_conversion_time = new RWBits(this.i2c_device, adress, 3, this._REG_CONFIG, 3, 2, false)
+                this.mode = new RWBits(this.i2c_device, adress, 3, this._REG_CONFIG, 0, 2, false)
+                this.mask_enable = new RWBits(this.i2c_device, adress, 16, this._REG_MASK_ENABLE, 0, 2, false)
+                this.alert_limit = new RWBits(this.i2c_device, adress, 16, this._REG_ALERT_LIMIT, 0, 2, false)
+                this._manufacturer_id = new ROUnaryStruct(this.i2c_device, adress, this._REG_MFG_UID, ">H")
+                this._device_id = new ROBits(this.i2c_device, adress, 12, this._REG_DIE_UID, 4, 2, false)
+                this.revision_id = new ROBits(this.i2c_device, adress, 4, this._REG_DIE_UID, 0, 2, false)
 
-                    if (this._manufacturer_id.val != this.TEXAS_INSTRUMENT_ID) {
-                        this.emit("error", new Error("Manufacturer ID is not same as intended! (" + this._manufacturer_id.val + " = " + this.TEXAS_INSTRUMENT_ID + ")"))
-                    }
-                    if (this._device_id.val != this.INA260_ID) {
-                        this.emit("error", new Error("Device ID is not same as intended! (" + this._device_id.val + " = " + this.INA260_ID + ")"))
-                    }
-
-                    this.mode.val = this.CONTINUOUS
-                    this.initialized = true
+                if (this._manufacturer_id.val != this.TEXAS_INSTRUMENT_ID) {
+                    this.emit("error", new Error("Manufacturer ID is not same as intended! (" + this._manufacturer_id.val + " = " + this.TEXAS_INSTRUMENT_ID + ")"))
                 }
-            })
+                if (this._device_id.val != this.INA260_ID) {
+                    this.emit("error", new Error("Device ID is not same as intended! (" + this._device_id.val + " = " + this.INA260_ID + ")"))
+                }
+
+                this.mode.val = this.CONTINUOUS
+                this.initialized = true
+            }
         }
     }
 

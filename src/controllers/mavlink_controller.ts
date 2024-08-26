@@ -33,6 +33,8 @@ import fs from "fs";
 import fsPromises from "fs/promises"
 import path from "path";
 import {FileHandle} from "node:fs/promises";
+import socketcan, {Message} from "socketcan"
+import * as can from "socketcan/build/Release/can.node";
 
 const UINT8_MAX = 2**8-1
 
@@ -63,6 +65,8 @@ export default class MavlinkController {
     ftp_write_file_name: string = ""
     ftp_file_handler: FileHandle | null = null
 
+    can_channel: any
+
     constructor(private main: Main) {
         for (const message of Object.values(REGISTRY)) {
             registerCustomMessageMagicNumber((message as MavLinkDataConstructor<MavLinkData>).MSG_ID.toString(),
@@ -77,6 +81,11 @@ export default class MavlinkController {
 
         if (this.main.in_production) {
             this.port = new SerialPort({path: "/dev/ttyAMA2", baudRate: 57600});
+
+            this.can_channel = socketcan.createRawChannel("can0")
+            this.can_channel.addListener("onMessage", (msg: Message) => {
+                console.log(msg)
+            });
         } else {
             this.port = connect({host: '0.0.0.0', port: 5432})
         }

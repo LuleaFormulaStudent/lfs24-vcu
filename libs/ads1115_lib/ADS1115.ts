@@ -1,4 +1,4 @@
-import {I2CBus} from "i2c-bus"
+import {I2CBus, openSync} from "i2c-bus"
 import {sleep} from "../../src/helper_functions.js";
 import os from "os"
 
@@ -47,9 +47,7 @@ export default class ADS1115 {
 
     constructor(private adress: number = 0x48, private bus_num: number = 1) {
         if (os.arch().startsWith("arm")) {
-            import("i2c-bus").then((i2c) => {
-                this.i2c_device = i2c.openSync(this.bus_num)
-            })
+            this.i2c_device = openSync(this.bus_num)
         }
     }
 

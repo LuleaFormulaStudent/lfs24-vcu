@@ -1,4 +1,4 @@
-import {I2CBus} from "i2c-bus"
+import {I2CBus, openSync} from "i2c-bus"
 import {sleep} from "../../src/helper_functions.js";
 import os from "os";
 import EventEmitter from "node:events";
@@ -141,66 +141,59 @@ export default class LSM6DS032 extends EventEmitter {
     constructor(private adress: number = 0x6A, private bus_num: number = 1) {
         super()
         if (os.arch().startsWith("arm")) {
-            import("i2c-bus").then(async (i2c) => {
-                this.i2c_device = i2c.openSync(this.bus_num)
-                await sleep(10)
-                const result = this.i2c_device.scanSync(adress)
-                if (!result.includes(adress)) {
-                    this.emit("error", new Error("LSM6DS032 device not found at adress, " + adress))
-                    console.log("error")
-                    this.i2c_device = null
-                } else {
-                    this._chip_id = new UnaryStruct(this.i2c_device, adress, this._LSM6DS_WHOAMI, "<b")
-                    // Structs
-                    this._raw_accel_data = new Struct(this.i2c_device, adress, this._LSM6DS_OUTX_L_A, "<hhh")
-                    this._raw_gyro_data = new Struct(this.i2c_device, adress, this._LSM6DS_OUTX_L_G, "<hhh")
-                    this._raw_temp_data = new Struct(this.i2c_device, adress, this._LSM6DS_OUT_TEMP_L, "<h")
-                    this._emb_func_en_a = new Struct(this.i2c_device, adress, this._LSM6DS_EMB_FUNC_EN_A, "<b")
-                    this._emb_func_en_b = new Struct(this.i2c_device, adress, this._LSM6DS_EMB_FUNC_EN_B, "<b")
-                    this._mlc0_src = new Struct(this.i2c_device, adress, this._LSM6DS_MLC0_SRC, "<bbbbbbbb")
-                    //RWBits:
-                    this._accel_range = new RWBits(this.i2c_device, adress, 2, this._LSM6DS_CTRL1_XL, 2)
-                    this._accel_data_rate = new RWBits(this.i2c_device, adress, 4, this._LSM6DS_CTRL1_XL, 4)
+            this.i2c_device = openSync(this.bus_num)
+            const result = this.i2c_device.scanSync(adress)
+            if (!result.includes(adress)) {
+                this.emit("error", new Error("LSM6DS032 device not found at adress, " + adress))
+                console.log("error")
+                this.i2c_device = null
+            } else {
+                this._chip_id = new UnaryStruct(this.i2c_device, adress, this._LSM6DS_WHOAMI, "<b")
+                // Structs
+                this._raw_accel_data = new Struct(this.i2c_device, adress, this._LSM6DS_OUTX_L_A, "<hhh")
+                this._raw_gyro_data = new Struct(this.i2c_device, adress, this._LSM6DS_OUTX_L_G, "<hhh")
+                this._raw_temp_data = new Struct(this.i2c_device, adress, this._LSM6DS_OUT_TEMP_L, "<h")
+                this._emb_func_en_a = new Struct(this.i2c_device, adress, this._LSM6DS_EMB_FUNC_EN_A, "<b")
+                this._emb_func_en_b = new Struct(this.i2c_device, adress, this._LSM6DS_EMB_FUNC_EN_B, "<b")
+                this._mlc0_src = new Struct(this.i2c_device, adress, this._LSM6DS_MLC0_SRC, "<bbbbbbbb")
+                //RWBits:
+                this._accel_range = new RWBits(this.i2c_device, adress, 2, this._LSM6DS_CTRL1_XL, 2)
+                this._accel_data_rate = new RWBits(this.i2c_device, adress, 4, this._LSM6DS_CTRL1_XL, 4)
 
-                    this._gyro_data_rate = new RWBits(this.i2c_device, adress, 4, this._LSM6DS_CTRL2_G, 4)
-                    this._gyro_range = new RWBits(this.i2c_device, adress, 2, this._LSM6DS_CTRL2_G, 2)
-                    this._gyro_range_125dps = new RWBit(this.i2c_device, adress, this._LSM6DS_CTRL2_G, 1)
+                this._gyro_data_rate = new RWBits(this.i2c_device, adress, 4, this._LSM6DS_CTRL2_G, 4)
+                this._gyro_range = new RWBits(this.i2c_device, adress, 2, this._LSM6DS_CTRL2_G, 2)
+                this._gyro_range_125dps = new RWBit(this.i2c_device, adress, this._LSM6DS_CTRL2_G, 1)
 
-                    this._sw_reset = new RWBit(this.i2c_device, adress, this._LSM6DS_CTRL3_C, 0)
-                    this._bdu = new RWBit(this.i2c_device, adress, this._LSM6DS_CTRL3_C, 6)
+                this._sw_reset = new RWBit(this.i2c_device, adress, this._LSM6DS_CTRL3_C, 0)
+                this._bdu = new RWBit(this.i2c_device, adress, this._LSM6DS_CTRL3_C, 6)
 
-                    this._high_pass_filter = new RWBits(this.i2c_device, adress, 2, this._LSM6DS_CTRL8_XL, 5)
-                    this._i3c_disable = new RWBit(this.i2c_device, adress, this._LSM6DS_CTRL9_XL, 1)
-                    this._pedometer_reset = new RWBit(this.i2c_device, adress, this._LSM6DS_CTRL10_C, 1)
-                    this._func_enable = new RWBit(this.i2c_device, adress, this._LSM6DS_CTRL10_C, 2)
-                    this._mem_bank = new RWBit(this.i2c_device, adress, this._LSM6DS_FUNC_CFG_ACCESS, 7)
-                    this._mlc_status = new RWBit(this.i2c_device, adress, this._LSM6DS_MLC_STATUS, 0)
-                    this._i3c_disable = new RWBit(this.i2c_device, adress, this._LSM6DS_CTRL9_XL, 0)
-                    this._block_data_enable = new RWBit(this.i2c_device, adress, this._LSM6DS_CTRL3_C, 4)
-                    this._route_int1 = new RWBit(this.i2c_device, adress, this._LSM6DS_MLC_INT1, 0)
-                    this._tap_latch = new RWBit(this.i2c_device, adress, this._LSM6DS_TAP_CFG0, 0)
-                    this._tap_clear = new RWBit(this.i2c_device, adress, this._LSM6DS_TAP_CFG0, 6)
-                    this._ped_enable = new RWBit(this.i2c_device, adress, this._LSM6DS_TAP_CFG, 6)
-                    this.pedometer_steps = new UnaryStruct(this.i2c_device, adress, this._LSM6DS_STEP_COUNTER, "<h")
+                this._high_pass_filter = new RWBits(this.i2c_device, adress, 2, this._LSM6DS_CTRL8_XL, 5)
+                this._i3c_disable = new RWBit(this.i2c_device, adress, this._LSM6DS_CTRL9_XL, 1)
+                this._pedometer_reset = new RWBit(this.i2c_device, adress, this._LSM6DS_CTRL10_C, 1)
+                this._func_enable = new RWBit(this.i2c_device, adress, this._LSM6DS_CTRL10_C, 2)
+                this._mem_bank = new RWBit(this.i2c_device, adress, this._LSM6DS_FUNC_CFG_ACCESS, 7)
+                this._mlc_status = new RWBit(this.i2c_device, adress, this._LSM6DS_MLC_STATUS, 0)
+                this._i3c_disable = new RWBit(this.i2c_device, adress, this._LSM6DS_CTRL9_XL, 0)
+                this._block_data_enable = new RWBit(this.i2c_device, adress, this._LSM6DS_CTRL3_C, 4)
+                this._route_int1 = new RWBit(this.i2c_device, adress, this._LSM6DS_MLC_INT1, 0)
+                this._tap_latch = new RWBit(this.i2c_device, adress, this._LSM6DS_TAP_CFG0, 0)
+                this._tap_clear = new RWBit(this.i2c_device, adress, this._LSM6DS_TAP_CFG0, 6)
+                this._ped_enable = new RWBit(this.i2c_device, adress, this._LSM6DS_TAP_CFG, 6)
+                this.pedometer_steps = new UnaryStruct(this.i2c_device, adress, this._LSM6DS_STEP_COUNTER, "<h")
 
-                    this.CHIP_ID = this._chip_id.val
-                    if (this.CHIP_ID !== this.LSM6DS_CHIP_ID) {
-                        this.emit("Wrong chip ID!")
-                    }
-                    this._sw_reset.val = true
-                    await sleep(10)
-                    this._bdu.val = true
-
-                    this.accelerometer_data_rate = "RATE_104_HZ"
-                    this.gyro_data_rate = "RATE_104_HZ"
-                    await sleep(100)
-                    this.accelerometer_range = "RANGE_4G"
-                    await sleep(200)
-                    this.gyro_range = "RANGE_250_DPS"
-                    await sleep(200)
-                    this.initialized = true
+                this.CHIP_ID = this._chip_id.val
+                if (this.CHIP_ID !== this.LSM6DS_CHIP_ID) {
+                    this.emit("Wrong chip ID!")
                 }
-            });
+                this._sw_reset.val = true
+                this._bdu.val = true
+
+                this.accelerometer_data_rate = "RATE_104_HZ"
+                this.gyro_data_rate = "RATE_104_HZ"
+                this.accelerometer_range = "RANGE_4G"
+                this.gyro_range = "RANGE_250_DPS"
+                this.initialized = true
+            }
         }
     }
 
