@@ -82,13 +82,15 @@ export default class MavlinkController {
         if (this.main.in_production) {
             this.port = new SerialPort({path: "/dev/ttyAMA2", baudRate: 57600});
 
-            this.can_channel = socketcan.createRawChannel("can0")
-            this.can_channel.addListener("onMessage", (msg: Message) => {
-                console.log(msg)
-            });
+
         } else {
             this.port = connect({host: '0.0.0.0', port: 5432})
         }
+
+        this.can_channel = socketcan.createRawChannel("can0")
+        this.can_channel.addListener("onMessage", (msg: Message) => {
+            console.log(msg)
+        });
 
         this.ftp = new MavFTP(<Writable>this.port, {protocol: this.mavlink_protocol})
         this.heartbeat = new Heartbeat(<Writable>this.port, {protocol: this.mavlink_protocol})

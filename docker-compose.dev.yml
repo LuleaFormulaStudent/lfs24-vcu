@@ -1,20 +1,14 @@
 services:
     database:
-        container_name: influxdb-database
+        container_name: influxdb
         image: influxdb
-        restart: always
-        env_file:
-            - .env
+        restart: no
+        env_file: ./.env
         ports:
             - "8086:8086"
         volumes:
             - ./data/influxdb-data:/var/lib/influxdb2
             - ./data/influxdb-config:/etc/influxdb2
-        healthcheck:
-            test: [ "CMD", "influx", "ping" ]
-            timeout: 5s
-            interval: 1m
-            retries: 3
 
     lfs_vcu:
         container_name: lfs-vcu
@@ -25,9 +19,7 @@ services:
         restart: no
         depends_on:
             database:
-                condition: service_healthy
-        networks:
-            - lfs-network
+                condition: service_started
         ports:
             - "5432:5432"
             - "6000:6000"
@@ -35,9 +27,4 @@ services:
             - ./data:/lfs-vcu/data
             - ./:/lfs-vcu/source
             - /var/run/docker.sock:/var/run/docker.sock
-        extra_hosts:
-            - "host.docker.internal:host-gateway"
-
-networks:
-    lfs-network:
-        driver: bridge
+        network_mode: "host"
