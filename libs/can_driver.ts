@@ -1,5 +1,6 @@
-import {createRawChannel, Message} from "socketcan"
+import {createRawChannel} from "socketcan"
 import {Readable} from "node:stream";
+import {Message} from "*can.node";
 
 export default class CanDriver extends Readable{
     private channel: any
@@ -7,17 +8,14 @@ export default class CanDriver extends Readable{
     constructor(channel: string = "can0") {
         super();
         this.channel = createRawChannel(channel)
-        this.channel.addListener("onMessage", (msg: any) => {
+        this.channel.addListener("onMessage", (msg: Message) => {
             this.emit("data", msg);
-            if (!this.push(msg["data"])) {
-                this.channel.pause(); // Pause emitting if the internal buffer is full
+            if (!this.push(msg.data)) {
+                this.channel.stop();
             }
         });
         this.on('drain', () => {
-            this.channel.resume();
-        });
-        this.channel.on('end', () => {
-            this.push(null);
+            this.channel.start();
         });
         this.channel.start()
     }
