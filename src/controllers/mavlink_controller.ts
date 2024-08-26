@@ -103,6 +103,7 @@ export default class MavlinkController {
                             //@ts-ignore
                             if (packet.protocol.hasOwnProperty("sysid") && packet.protocol["sysid"] == 254) {
                                 this.send_mav_messages = true
+                                this.setupMAVMessages()
                             }
                             //@ts-ignore
                             if (packet_data.hasOwnProperty("targetSystem") && packet_data["targetSystem"]! == this.SYS_ID && packet_data.hasOwnProperty("targetComponent") && packet_data["targetComponent"] == this.COMP_ID) {
