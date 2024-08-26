@@ -26,8 +26,6 @@ services:
         depends_on:
             database:
                 condition: service_healthy
-            redis:
-                condition: service_started
         networks:
             - lfs-network
         ports:
