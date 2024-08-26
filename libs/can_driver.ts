@@ -1,14 +1,13 @@
 import {createRawChannel, Message} from "socketcan"
-import EventEmitter from "node:events";
 import {Readable} from "node:stream";
 
-export default class CanDriver extends EventEmitter, Readable{
+export default class CanDriver extends Readable{
     private channel: any
 
     constructor(channel: string = "can0") {
         super();
         this.channel = createRawChannel(channel)
-        this.channel.addListener("onMessage", (msg: Message) => {
+        this.channel.addListener("onMessage", (msg: any) => {
             this.emit("data", msg);
             this.push(msg["data"])
         });

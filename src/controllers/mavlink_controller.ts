@@ -33,7 +33,7 @@ import fs from "fs";
 import fsPromises from "fs/promises"
 import path from "path";
 import {FileHandle} from "node:fs/promises";
-import CanDriver from "../../libs/can_driver";
+import CanDriver from "../../libs/can_driver.js";
 
 
 const UINT8_MAX = 2**8-1
@@ -65,7 +65,7 @@ export default class MavlinkController {
     ftp_write_file_name: string = ""
     ftp_file_handler: FileHandle | null = null
 
-    can_driver: CanDriver
+    can_driver: CanDriver | null = null
 
     constructor(private main: Main) {
         for (const message of Object.values(REGISTRY)) {
