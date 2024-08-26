@@ -2,8 +2,8 @@ import DS3502 from "../../libs/DS3502/DS3502.js";
 import Main from "../../main.js";
 import {MavState} from "mavlink-mappings/dist/lib/minimal.js";
 import {common, sleep, waitFor} from "node-mavlink";
-import {MavResult} from "mavlink-mappings/dist/lib/common";
-import {MavModeFlag} from "mavlink-mappings/dist/lib/minimal";
+import {MavResult} from "mavlink-mappings/dist/lib/common.js";
+import {MavModeFlag} from "mavlink-mappings/dist/lib/minimal.js";
 import {DrivingMode} from "mavlink-lib/dist/lfs.js";
 
 export default class TractionSystemController {
