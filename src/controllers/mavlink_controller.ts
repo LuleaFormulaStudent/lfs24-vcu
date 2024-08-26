@@ -33,8 +33,7 @@ import fs from "fs";
 import fsPromises from "fs/promises"
 import path from "path";
 import {FileHandle} from "node:fs/promises";
-import socketcan, {Message} from "socketcan"
-import * as can from "socketcan/build/Release/can.node";
+import {createRawChannel, Message} from "socketcan"
 
 const UINT8_MAX = 2**8-1
 
@@ -87,10 +86,11 @@ export default class MavlinkController {
             this.port = connect({host: '0.0.0.0', port: 5432})
         }
 
-        this.can_channel = socketcan.createRawChannel("can0")
+        this.can_channel = createRawChannel("can0")
         this.can_channel.addListener("onMessage", (msg: Message) => {
             console.log(msg)
         });
+        this.can_channel.start()
 
         this.ftp = new MavFTP(<Writable>this.port, {protocol: this.mavlink_protocol})
         this.heartbeat = new Heartbeat(<Writable>this.port, {protocol: this.mavlink_protocol})
