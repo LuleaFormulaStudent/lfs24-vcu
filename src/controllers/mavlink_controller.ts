@@ -10,7 +10,7 @@ import {
     registerCustomMessageMagicNumber,
     send
 } from 'node-mavlink'
-import {Writable} from "node:stream";
+import {Readable, Writable} from "node:stream";
 import {MavAutopilot, MavModeFlag, MavType} from "mavlink-mappings/dist/lib/minimal.js";
 import {Heartbeat} from "node-mavlink-heartbeat";
 import {MavLinkData} from "mavlink-mappings";
@@ -34,9 +34,10 @@ import fsPromises from "fs/promises"
 import path from "path";
 import {FileHandle} from "node:fs/promises";
 import CanDriver from "../../libs/can_driver.js";
+import {Message} from "*can.node";
 
 
-const UINT8_MAX = 2**8-1
+const UINT8_MAX = 2 ** 8 - 1
 
 export default class MavlinkController {
 
@@ -87,14 +88,15 @@ export default class MavlinkController {
 
         this.can_driver = new CanDriver()
         this.can_driver
-            .pipe(new MavLinkPacketSplitter())
-            .pipe(new MavLinkPacketParser())
-            .on("data", (packet) => {
-                const clazz: MavLinkDataConstructor<MavLinkData> = this.REGISTRY[packet.header.msgid]
-                if (clazz) {
-                    const packet_data = packet.protocol.data(packet.payload, clazz)
-                    console.log(packet_data)
-                }
+            .on("data", (raw_data: Message) => {
+                Readable.from(raw_data.data).pipe(new MavLinkPacketSplitter())
+                    .pipe(new MavLinkPacketParser()).on("data", (packet: MavLinkPacket) => {
+                    const clazz: MavLinkDataConstructor<MavLinkData> = this.REGISTRY[packet.header.msgid]
+                    if (clazz) {
+                        const packet_data = packet.protocol.data(packet.payload, clazz)
+                        console.log(packet_data)
+                    }
+                })
             })
 
         this.ftp = new MavFTP(<Writable>this.port, {protocol: this.mavlink_protocol})
@@ -236,8 +238,8 @@ export default class MavlinkController {
             if (data._param2 == common.MotorTestThrottleType.THROTTLE_PERCENT) {
                 if (data._param3 == 0) {
                     await this.main.traction_system_controller.abortMotorTest()
-                } else  {
-                    await this.main.traction_system_controller.doMotorTest(data._param3 / 100, data._param3 > 0? DrivingMode.FORWARD: DrivingMode.REVERSE, data._param4*1000)
+                } else {
+                    await this.main.traction_system_controller.doMotorTest(data._param3 / 100, data._param3 > 0 ? DrivingMode.FORWARD : DrivingMode.REVERSE, data._param4 * 1000)
                 }
             } else {
                 await this.sendCmdAck(common.MavCmd.DO_MOTOR_TEST, MavResult.UNSUPPORTED)
@@ -253,7 +255,7 @@ export default class MavlinkController {
             await this.send(data)
         } else if (data instanceof common.FileTransferProtocol) {
             await this.onFTPEvent(data)
-        }else {
+        } else {
             await this.main.logs_controller.warning('Received packet:' + data.toString())
         }
     }
@@ -446,7 +448,7 @@ export default class MavlinkController {
                 fs.unlinkSync(this.ftp_write_file_name)
             }
             this.ftp_file_handler = await fsPromises.open(this.ftp_write_file_name, "w+");
-            this.ftp_session = Math.round(Math.random()*255)
+            this.ftp_session = Math.round(Math.random() * 255)
             await this.send(this.ftpPayload(MavFtpOpcode.ACK))
         } else if (payload.opcode == MavFtpOpcode.WRITEFILE) {
             if (this.ftp_write_file_name && this.ftp_file_handler && payload.session == this.ftp_session) {
