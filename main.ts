@@ -54,6 +54,13 @@ export default class Main {
         await this.logs_controller.info("Starting initialization of system..")
         await this.logs_controller.info("Version: " + this.version)
 
+
+        process.on('exit', this.onExit);
+        process.on('SIGINT', this.onExit);
+        process.on('SIGUSR1', this.onExit);
+        process.on('SIGUSR2', this.onExit);
+        process.on('uncaughtException', this.onExit);
+
         if (this.in_production) {
             await this.logs_controller.info("System is in production mode.")
         } else {
@@ -171,6 +178,10 @@ export default class Main {
             console.log(e)
             await this.logs_controller.error("Problem parsing zip, maybe it is corrupt")
         }
+    }
+
+    onExit() {
+        this.digital_outputs_controller.setCoolantPumpOutput(false)
     }
 }
 
