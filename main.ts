@@ -55,14 +55,28 @@ export default class Main {
         await this.logs_controller.info("Version: " + this.version)
 
         if (this.in_production) {
-            const onExit = () => {
+            const onExit = (err: any) => {
                 this.digital_outputs_controller.setCoolantPumpOutput(false)
+                this.digital_outputs_controller.setForwardSwitch(false)
+                this.digital_outputs_controller.setReverseSwitch(false)
+
+                if (this.data_controller.params.system_state == MavState.ACTIVE) {
+                    this.traction_system_controller.deactivateTS()
+                }
+
+                if (err) {
+                    this.status_led.setGreenLED(false)
+                    this.status_led.setBlueLED(false)
+                    this.status_led.setRedLED(true)
+                    console.error(err)
+                }
             }
             process.on('exit', onExit);
             process.on('SIGINT', onExit);
             process.on('SIGUSR1',onExit);
             process.on('SIGUSR2', onExit);
             process.on('uncaughtException', onExit);
+
             await this.logs_controller.info("System is in production mode.")
         } else {
             await this.logs_controller.info("System is in development mode.")
