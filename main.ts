@@ -40,9 +40,9 @@ export default class Main {
     constructor() {
         this.logs_controller = new LogsController(this)
         this.data_controller = new DataController(this)
+        this.digital_outputs_controller = new DigitalOutputsController(this)
         this.status_led = new StatusLed(this)
         this.traction_system_controller = new TractionSystemController(this)
-        this.digital_outputs_controller = new DigitalOutputsController(this)
         this.steering_wheel_controller = new SteeringWheelController(this)
         this.mavlink_controller = new MavlinkController(this)
         this.hil_controller = new HILController(this)
@@ -54,14 +54,15 @@ export default class Main {
         await this.logs_controller.info("Starting initialization of system..")
         await this.logs_controller.info("Version: " + this.version)
 
-
-        process.on('exit', this.onExit);
-        process.on('SIGINT', this.onExit);
-        process.on('SIGUSR1', this.onExit);
-        process.on('SIGUSR2', this.onExit);
-        process.on('uncaughtException', this.onExit);
-
         if (this.in_production) {
+            const onExit = () => {
+                this.digital_outputs_controller.setCoolantPumpOutput(false)
+            }
+            process.on('exit', onExit);
+            process.on('SIGINT', onExit);
+            process.on('SIGUSR1',onExit);
+            process.on('SIGUSR2', onExit);
+            process.on('uncaughtException', onExit);
             await this.logs_controller.info("System is in production mode.")
         } else {
             await this.logs_controller.info("System is in development mode.")
@@ -178,10 +179,6 @@ export default class Main {
             console.log(e)
             await this.logs_controller.error("Problem parsing zip, maybe it is corrupt")
         }
-    }
-
-    onExit() {
-        this.digital_outputs_controller.setCoolantPumpOutput(false)
     }
 }
 
