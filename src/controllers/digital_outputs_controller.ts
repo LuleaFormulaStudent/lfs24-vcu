@@ -14,9 +14,7 @@ export default class DigitalOutputsController  {
     }
 
     async init() {
-        if (this.main.data_controller.params.cool_pump_start) {
-            this.setCoolantPumpOutput(true)
-        }
+        this.setCoolantPumpOutput(this.main.data_controller.params.cool_pump_start)
 
         await this.main.logs_controller.debug("Digital outputs controller initialized!")
     }

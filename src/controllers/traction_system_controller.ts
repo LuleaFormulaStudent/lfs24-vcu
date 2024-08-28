@@ -1,9 +1,8 @@
 import DS3502 from "../../libs/DS3502/DS3502.js";
 import Main from "../../main.js";
-import {MavState} from "mavlink-mappings/dist/lib/minimal.js";
+import {MavModeFlag, MavState} from "mavlink-mappings/dist/lib/minimal.js";
 import {common, sleep, waitFor} from "node-mavlink";
 import {MavResult} from "mavlink-mappings/dist/lib/common.js";
-import {MavModeFlag} from "mavlink-mappings/dist/lib/minimal.js";
 import {DrivingMode} from "mavlink-lib/dist/lfs.js";
 
 export default class TractionSystemController {
@@ -64,15 +63,19 @@ export default class TractionSystemController {
                 return false
             }
 
-            if (!this.main.isInSystemMode(MavModeFlag.TEST_ENABLED) && this.main.data_controller.params.brake_input < 0.3) {
+            /*if (!this.main.isInSystemMode(MavModeFlag.TEST_ENABLED) && this.main.data_controller.params.brake_input < 0.3) {
                 await this.main.logs_controller.info("Brakes is not applied!")
                 return false
-            }
+            }*/ // TODO: Reactivate this when testing is done
 
             await this.main.logs_controller.info("Trying to activate traction system..")
             this.main.digital_outputs_controller.setTSActiveRelay(true)
 
+            await this.main.setSystemState(MavState.ACTIVE) // TODO Remove this line later
+
             await waitFor(() => this.main.data_controller.params.system_state == MavState.ACTIVE, 5000, 100)
+
+            await this.main.logs_controller.info("Traction system activated!")
             return true
         } catch (e) {
             if (e == "Timeout") {
@@ -92,6 +95,8 @@ export default class TractionSystemController {
             this.main.setDrivingMode(DrivingMode.NEUTRAL)
             await sleep(500)
             this.main.digital_outputs_controller.setTSActiveRelay(false)
+
+            await this.main.setSystemState(MavState.STANDBY)
             await waitFor(() => this.main.data_controller.params.system_state == MavState.STANDBY, 3000, 100)
             return true
         } catch (e) {
@@ -135,10 +140,12 @@ export default class TractionSystemController {
             }
         } else {
             await this.main.logs_controller.info("Skipping activating TS because of not in production.")
+            this.main.data_controller.params.throttle_output = throttle
             this.performing_motor_test = true
             this.motor_test_timeout = setTimeout(async () => {
                 this.main.setSystemMode(MavModeFlag.TEST_ENABLED, false)
                 await this.main.logs_controller.info("Motor test done!")
+                this.main.data_controller.params.throttle_output = 0
                 await this.main.mavlink_controller.sendCmdAck(common.MavCmd.DO_MOTOR_TEST, MavResult.ACCEPTED, 100)
                 this.performing_motor_test = false
             }, time)

@@ -61,15 +61,17 @@ export default class Main {
                 this.digital_outputs_controller.setReverseSwitch(false)
 
                 if (this.data_controller.params.system_state == MavState.ACTIVE) {
-                    this.traction_system_controller.deactivateTS()
+                    //this.traction_system_controller.deactivateTS()
                 }
 
+                this.status_led.setGreenLED(false)
+                this.status_led.setBlueLED(false)
                 if (err) {
-                    this.status_led.setGreenLED(false)
-                    this.status_led.setBlueLED(false)
                     this.status_led.setRedLED(true)
                     console.error(err)
                 }
+                this.logs_controller.info("Exiting..")
+                process.exit(0)
             }
             process.on('exit', onExit);
             process.on('SIGINT', onExit);

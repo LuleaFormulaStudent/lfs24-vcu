@@ -31,7 +31,6 @@ export default class ParamsHandler extends EventEmitter {
                                 this.__this.events[param].emit("change", ({param, value, timestamp: Date.now()}))
                             }
                             this.__this.emit("change", ({param, value, timestamp: Date.now()}))
-                            //this.__this.storage.setItem(param, value)
                         }
                     } else {
                         this["_" + param] = value
@@ -39,7 +38,6 @@ export default class ParamsHandler extends EventEmitter {
                             this.__this.events[param].emit("change", ({param, value, timestamp: Date.now()}))
                         }
                         this.__this.emit("change", ({param, value, timestamp: Date.now()}))
-                        //this.__this.storage.setItem(param, value)
                     }
                 },
                 get(): any {
@@ -50,6 +48,10 @@ export default class ParamsHandler extends EventEmitter {
         for (const [key, val] of Object.entries(params)) {
             this.params[key] = this.storage.getItem(key) || val
         }
+    }
+
+    saveParam(param: string, value: any) {
+        this.storage.setItem(param, value)
     }
 
     getParams() {

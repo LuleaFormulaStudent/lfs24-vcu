@@ -48,7 +48,7 @@ export default class SteeringWheelController {
                     } else if (event == "btn_r" && val == 2) {
                         clearTimeout(this.driving_mode_reverse_timeout)
                     }
-                    if (event == "btn_p" && val == 1) {
+                    if (event == "btn_p" && val == 4) {
                         this.activate_ts_timeout = setTimeout(() => {
                             if (this.main.data_controller.params.system_state == MavState.ACTIVE) {
                                 this.main.traction_system_controller.deactivateTS()
@@ -56,7 +56,7 @@ export default class SteeringWheelController {
                                 this.main.traction_system_controller.activateTS()
                             }
                         }, 2000)
-                    } else if (event == "btn_r" && val == 2) {
+                    } else if (event == "btn_r" && val == 4) {
                         clearTimeout(this.activate_ts_timeout)
                     }
                     if (event == "cp") {
@@ -64,6 +64,8 @@ export default class SteeringWheelController {
                     }
                     if (event == "cp_s") {
                         this.main.data_controller.params.cool_pump_start = val == 1
+                        this.main.data_controller.saveParam("cool_pump_start", val == 1)
+                        this.main.logs_controller.info("Changing behavior for coolant pump on startup: " + (val == 1))
                     }
                 } catch (e) {
                     console.log(line)

@@ -20,9 +20,6 @@ services:
         depends_on:
             database:
                 condition: service_started
-        ports:
-            - "5432:5432"
-            - "6000:6000"
         volumes:
             - ./data:/lfs-vcu/data
             - ./:/lfs-vcu/source

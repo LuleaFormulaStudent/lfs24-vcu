@@ -9,13 +9,8 @@ export default class CanDriver extends Readable{
         super();
         this.channel = createRawChannel(channel)
         this.channel.addListener("onMessage", (msg: Message) => {
-            this.emit("data", msg);
-            if (!this.push(msg.data)) {
-                this.channel.stop();
-            }
-        });
-        this.on('drain', () => {
-            this.channel.start();
+            console.log(msg.data)
+            this.emit("data", [msg.data.readInt16LE(6), msg.data.readInt16LE(4), msg.data.readInt16LE(2), msg.data.readInt16LE()]);
         });
         this.channel.start()
     }

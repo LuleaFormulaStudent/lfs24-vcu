@@ -15,7 +15,7 @@ export default class RelayBoard {
 
     constructor() {
         this.output_1 = new Gpio(535, 'out');
-        this.output_2 = new Gpio(536, 'out');
+        this.output_2 = new Gpio(536, 'out');// TS ACTIVATE
         //this.output_3 = new Gpio(519, 'out'); // Does not Work!!
         this.output_4 = new Gpio(528, 'out'); // Reverse Direction
         this.output_5 = new Gpio(532, 'out'); // Foot Switch
@@ -28,32 +28,32 @@ export default class RelayBoard {
         }
     }
 
-    setOutput(port: RelayOutputPort, state: Boolean) {
-        const out: number = 1 - <number><unknown>state
+    setOutput(port: RelayOutputPort, state: boolean) {
+        let out: BinaryValue = state? 0 : 1
         switch (port) {
             case 1:
-                this.output_1.writeSync(<BinaryValue>out)
+                this.output_1.writeSync(out)
                 break;
             case 2:
-                this.output_2.writeSync(<BinaryValue>out)
+                this.output_2.writeSync(out)
                 break;
             case 3:
                 //this.output_3.writeSync(<BinaryValue> out)
                 break;
             case 4:
-                this.output_4.writeSync(<BinaryValue>out)
+                this.output_4.writeSync(out)
                 break;
             case 5:
-                this.output_5.writeSync(<BinaryValue>out)
+                this.output_5.writeSync(out)
                 break;
             case 6:
-                this.output_6.writeSync(<BinaryValue>out)
+                this.output_6.writeSync(out)
                 break;
             case 7:
-                this.output_7.writeSync(<BinaryValue>out)
+                this.output_7.writeSync(out)
                 break;
             case 8:
-                this.output_8.writeSync(<BinaryValue>out)
+                this.output_8.writeSync(out)
                 break;
         }
     }

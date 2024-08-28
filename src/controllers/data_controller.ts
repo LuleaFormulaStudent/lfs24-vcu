@@ -12,6 +12,7 @@ import LSM6DS032 from "../../libs/LSM6DS032/LSM6DS032.js";
 import SystemInfo, {SystemInfoData} from "../../libs/system_info/system_info.js";
 import GPSDriver, {GGAQuality} from "../../libs/gps/gps_driver.js";
 import INA260 from "../../libs/ina260/ina260.js";
+import CanDriver from "../../libs/can_driver.js";
 
 export const INT16_MAX = 2 ** 15 - 1
 export const INT32_MAX = 2 ** 31 - 1
@@ -24,6 +25,7 @@ export default class DataController extends ParamsHandler {
     imu: LSM6DS032 | null = null
     ina: INA260 | null = null
     system_info: SystemInfo
+    can_driver: CanDriver | null = null
 
     inlfuxdb_client: WriteApi
     measurement_name: string
@@ -269,6 +271,7 @@ export default class DataController extends ParamsHandler {
             //this.ads = new ADS1115()
             this.imu = new LSM6DS032()
             this.ina = new INA260()
+            this.can_driver = new CanDriver()
         }
 
         const inlfuxdb = new InfluxDB({
@@ -347,11 +350,11 @@ export default class DataController extends ParamsHandler {
                     const throttle_normalized = map_range(this.params.throttle_raw, this.params.throttle_raw_min, this.params.throttle_raw_max, 0, 1)
                     this.params.throttle_input = map_range(Math.max(throttle_normalized, this.main.data_controller.params.throttle_dz), this.main.data_controller.params.throttle_dz, 1, 0, 1)
                     const brake_normalized = map_range(this.params.brake_raw, this.params.brake_raw_min, this.params.brake_raw_max, 0, 1)
-                    this.params.brake_input =  map_range(Math.max(brake_normalized, this.main.data_controller.params.brake_dz), this.main.data_controller.params.brake_dz, 1, 0, 1)
+                    this.params.brake_input = map_range(Math.max(brake_normalized, this.main.data_controller.params.brake_dz), this.main.data_controller.params.brake_dz, 1, 0, 1)
                 }
             })
 
-            this.co_mcu.on("ts_active", (ts_active) => {
+            /*this.co_mcu.on("ts_active", (ts_active) => {
                 if (this.params.system_state == MavState.STANDBY && ts_active == 1) {
                     this.main.setSystemState(MavState.ACTIVE)
                 } else if (this.params.system_state == MavState.ACTIVE && ts_active == 0) {
@@ -360,7 +363,7 @@ export default class DataController extends ParamsHandler {
                         this.main.traction_system_controller.onUnexpectedTSShutdown()
                     }
                 }
-            })
+            })*/
 
             this.co_mcu.on("ind_sensors", (data) => {
                 [this.params.ind_3_raw_freq, this.params.ind_2_raw_freq, this.params.ind_1_raw_freq] = data
@@ -436,7 +439,7 @@ export default class DataController extends ParamsHandler {
 
                 }
                 if (data.hasOwnProperty("fix")) {
-                    this.params.gps_mode = data.fix == "3D"? GpsFixType.GPS_FIX_TYPE_3D_FIX: GpsFixType.GPS_FIX_TYPE_2D_FIX
+                    this.params.gps_mode = data.fix == "3D" ? GpsFixType.GPS_FIX_TYPE_3D_FIX : GpsFixType.GPS_FIX_TYPE_2D_FIX
                 }
                 if (data.hasOwnProperty("heading")) {
                     this.params.gps_heading = data.heading
@@ -452,9 +455,9 @@ export default class DataController extends ParamsHandler {
         if (this.ina && !this.main.isInSystemMode(MavModeFlag.HIL_ENABLED)) {
             this.ina.on("error", (err) => this.main.logs_controller.error("INA260 Error:", err))
             this.ina.on("data", (data) => {
-                this.params.lv_cur_power = data[0]
+                this.params.lv_cur_power = data[0] / 1000
                 this.params.lv_cur_voltage = data[1]
-                this.params.lv_cur_amp = data[2]
+                this.params.lv_cur_amp = data[2] / 1000
 
                 const current_time = this.main.uptime
                 if (this.last_ina_update > 0) {
@@ -464,7 +467,14 @@ export default class DataController extends ParamsHandler {
                 this.last_imu_update = current_time
             })
 
-            this.ina.startPoll(20)
+            this.ina.startPoll(50)
+        }
+
+        if (this.can_driver) {
+            this.can_driver = new CanDriver()
+            this.can_driver.on("data", (raw_data: number[]) => {
+                console.log(raw_data)
+            })
         }
 
         this.system_info.on("data", (data: SystemInfoData) => {
@@ -497,26 +507,25 @@ export default class DataController extends ParamsHandler {
     calculateVehicleSpeed() {
         let speeds_used = 0
         const speeds = [
-            this.params.fl_wheel_speed*3.6,
-            this.params.fr_wheel_speed*3.6,
-            this.params.rear_axle_speed*3.6,
-            //this.params.imu_lon_speed*3.6
+            this.params.fl_wheel_speed * 3.6,
+            this.params.fr_wheel_speed * 3.6,
+            this.params.rear_axle_speed * 3.6,
+            //this.params.imu_lon_speed*3.6 // TODO re-add this after calibrating
         ]
 
         let vehicle_speed = 0
         for (let i = 0; i < speeds.length; i++) {
-            if (speeds[i] > 1){
+            if (!isNaN(speeds[i]) && speeds[i] > 1) {
                 vehicle_speed += speeds[i]
                 speeds_used++
             }
         }
 
-        /*if (this.params.gps_speed > 1) {
+        if (this.params.gps_speed > 1) {
             vehicle_speed += this.params.gps_speed
             speeds_used++
-        }*/
+        }
 
-        //console.log(this.params.fl_wheel_speed, this.params.fr_wheel_speed, this.params.rear_axle_speed, this.params.gps_speed), //this.params.imu_lon_speed)
-        this.params.vehicle_speed = Math.round(vehicle_speed / speeds_used)
+        this.params.vehicle_speed = Math.round(vehicle_speed / (speeds_used == 0 ? 1 : speeds_used))
     }
 }

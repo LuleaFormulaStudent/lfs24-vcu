@@ -33,8 +33,6 @@ import fs from "fs";
 import fsPromises from "fs/promises"
 import path from "path";
 import {FileHandle} from "node:fs/promises";
-import CanDriver from "../../libs/can_driver.js";
-import {Message} from "*can.node";
 
 
 const UINT8_MAX = 2 ** 8 - 1
@@ -66,8 +64,6 @@ export default class MavlinkController {
     ftp_write_file_name: string = ""
     ftp_file_handler: FileHandle | null = null
 
-    can_driver: CanDriver | null = null
-
     constructor(private main: Main) {
         for (const message of Object.values(REGISTRY)) {
             registerCustomMessageMagicNumber((message as MavLinkDataConstructor<MavLinkData>).MSG_ID.toString(),
@@ -85,19 +81,6 @@ export default class MavlinkController {
         } else {
             this.port = connect({host: '0.0.0.0', port: 5432})
         }
-
-        this.can_driver = new CanDriver()
-        this.can_driver
-            .on("data", (raw_data: Message) => {
-                Readable.from(raw_data.data).pipe(new MavLinkPacketSplitter())
-                    .pipe(new MavLinkPacketParser()).on("data", (packet: MavLinkPacket) => {
-                    const clazz: MavLinkDataConstructor<MavLinkData> = this.REGISTRY[packet.header.msgid]
-                    if (clazz) {
-                        const packet_data = packet.protocol.data(packet.payload, clazz)
-                        console.log(packet_data)
-                    }
-                })
-            })
 
         this.ftp = new MavFTP(<Writable>this.port, {protocol: this.mavlink_protocol})
         this.heartbeat = new Heartbeat(<Writable>this.port, {protocol: this.mavlink_protocol})
@@ -119,7 +102,7 @@ export default class MavlinkController {
                         if (clazz) {
                             const packet_data = packet.protocol.data(packet.payload, clazz)
                             //@ts-ignore
-                            if (packet.protocol.hasOwnProperty("sysid") && packet.protocol["sysid"] == 254) {
+                            if (packet.protocol.hasOwnProperty("sysid") && packet.protocol["sysid"] == 254 && !this.send_mav_messages) {
                                 this.send_mav_messages = true
                                 this.setupMAVMessages()
                             }
@@ -227,6 +210,7 @@ export default class MavlinkController {
                 this.main.data_controller.params[data.paramId] = data.paramValue
                 await this.send(this.create_param_msg(data.paramId, 0))
                 await this.main.logs_controller.info("Setting parameter: " + data.paramId + " = " + data.paramValue)
+                this.main.data_controller.saveParam(data.paramId, data.paramValue)
             } catch (e: any) {
                 await this.main.logs_controller.error("Error setting parameter: (" + data.paramId + " = " + data.paramValue + "). " + e.toString())
             }
@@ -305,13 +289,13 @@ export default class MavlinkController {
                     lv_battery_msg.type = MavBatteryType.LIFE
                     lv_battery_msg.batteryRemaining = Math.round(this.main.data_controller.params.lv_bdi * 100)
                     lv_battery_msg.chargeState = MavBatteryChargeState.UNDEFINED
-                    lv_battery_msg.currentBattery = this.main.data_controller.params.lv_cur_amp
+                    lv_battery_msg.currentBattery = this.main.data_controller.params.lv_cur_amp*100
                     lv_battery_msg.timeRemaining = 0
                     lv_battery_msg.temperature = this.main.data_controller.params.lv_cur_temp * 100
-                    lv_battery_msg.currentConsumed = this.main.data_controller.params.lv_cons_cap
-                    lv_battery_msg.energyConsumed = this.main.data_controller.params.lv_cons_energy
+                    lv_battery_msg.currentConsumed = this.main.data_controller.params.lv_cons_cap*1000
+                    lv_battery_msg.energyConsumed = this.main.data_controller.params.lv_cons_energy*1000
                     lv_battery_msg.mode = MavBatteryMode.UNKNOWN
-                    lv_battery_msg.voltages[0] = this.main.data_controller.params.lv_cur_voltage
+                    lv_battery_msg.voltages[0] = this.main.data_controller.params.lv_cur_voltage*100
 
                     const hv_battery_msg = new common.BatteryStatus()
                     hv_battery_msg.id = 1
@@ -319,13 +303,13 @@ export default class MavlinkController {
                     hv_battery_msg.type = MavBatteryType.LIFE
                     hv_battery_msg.batteryRemaining = Math.round(this.main.data_controller.params.hv_bdi * 100)
                     hv_battery_msg.chargeState = MavBatteryChargeState.UNDEFINED
-                    hv_battery_msg.currentBattery = this.main.data_controller.params.hv_cur_amp
+                    hv_battery_msg.currentBattery = this.main.data_controller.params.hv_cur_amp*100
                     hv_battery_msg.timeRemaining = 0
                     hv_battery_msg.temperature = this.main.data_controller.params.hv_cur_temp * 100
-                    hv_battery_msg.currentConsumed = this.main.data_controller.params.hv_cons_cap
-                    hv_battery_msg.energyConsumed = this.main.data_controller.params.hv_cons_energy
+                    hv_battery_msg.currentConsumed = this.main.data_controller.params.hv_cons_cap*1000
+                    hv_battery_msg.energyConsumed = this.main.data_controller.params.hv_cons_energy*1000
                     hv_battery_msg.mode = MavBatteryMode.UNKNOWN
-                    hv_battery_msg.voltages[0] = this.main.data_controller.params.hv_cur_voltage
+                    hv_battery_msg.voltages[0] = this.main.data_controller.params.hv_cur_voltage*100
 
                     return [lv_battery_msg, hv_battery_msg]
                 }
