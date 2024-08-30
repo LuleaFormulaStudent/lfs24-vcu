@@ -6,7 +6,7 @@ export default class ParamsHandler extends EventEmitter {
     events: { [propName: string]: EventEmitter } = {}
     params: any = {}
 
-    storage = new LocalStorage("./data/params/")
+    private storage = new LocalStorage("./data/params/")
 
     constructor(params = {}, params_settings: {[propName: string]: {min?: number, max?: number}} = {}) {
         super()
@@ -22,9 +22,9 @@ export default class ParamsHandler extends EventEmitter {
                 set(value) {
                     if (this.__params_settings.hasOwnProperty(param)) {
                         if (this.__params_settings[param].hasOwnProperty("min") && value < this.__params_settings[param].min) {
-                            this.__this.emit("error", {error: "min", msg: "Error! Min value triggered!", param, value, timestamp: Date.now()})
+                            this.__this.emit("warning", {error: "min", msg: "Min value triggered for " + param + "=" + value, param, value, timestamp: Date.now()})
                         } else if (this.__params_settings[param].hasOwnProperty("max") && value > this.__params_settings[param].max) {
-                            this.__this.emit("error", {error: "max", msg: "Error! Max value triggered!", param, value, timestamp: Date.now()})
+                            this.__this.emit("warning", {error: "max", msg: "Max value triggered for " + param + "=" + value, timestamp: Date.now()})
                         } else {
                             this["_" + param] = value
                             if (this.__this.events.hasOwnProperty(param)) {
@@ -46,7 +46,24 @@ export default class ParamsHandler extends EventEmitter {
             });
         }
         for (const [key, val] of Object.entries(params)) {
-            this.params[key] = this.storage.getItem(key) || val
+            this.params[key] = this.getParam(key)|| val
+        }
+    }
+
+    getParam(param: string): null | number | boolean | string {
+        if (this.storage.getItem(param) != null) {
+            const value: string = this.storage.getItem(param)!
+            if (value == "false") {
+                return false
+            } else if (value == "true") {
+                return true
+            } else if (!isNaN(parseFloat(value))) {
+                return parseFloat(value)
+            } else {
+                return value
+            }
+        } else {
+            return null
         }
     }
 

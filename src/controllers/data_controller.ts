@@ -212,7 +212,7 @@ export default class DataController extends ParamsHandler {
             },
             gps_num_sats: {
                 min: 0,
-                max: 15
+                max: 20
             },
             gps_altitude: {
                 min: -200,
@@ -281,13 +281,16 @@ export default class DataController extends ParamsHandler {
 
         this.measurement_name = "drive_" + new Date(Date.now()).toISOString()
 
-        this.inlfuxdb_client = inlfuxdb.getWriteApi(process.env.DOCKER_INFLUXDB_INIT_ORG || "", process.env.DOCKER_INFLUXDB_INIT_BUCKET || "", 'us')
+        this.inlfuxdb_client = inlfuxdb.getWriteApi(process.env.DOCKER_INFLUXDB_INIT_ORG || "", process.env.DOCKER_INFLUXDB_INIT_BUCKET || "", 'ms')
     }
 
     async init() {
         await this.main.logs_controller.debug("Initializing data controller..")
         this.on("error", (err) => {
             this.main.logs_controller.error("Error with data:", err)
+        })
+        this.on("warning", (warning) => {
+            this.main.logs_controller.warning(warning.msg)
         })
 
         setInterval(() => {
@@ -299,7 +302,7 @@ export default class DataController extends ParamsHandler {
         }, 100)
 
         this.on("change", ({param, value, timestamp}) => {
-            if (this.main.data_controller.params.system_state == MavState.ACTIVE) {
+            if (this.params.system_state == MavState.ACTIVE) {
                 let point = new Point(this.measurement_name)
                     .tag('type', 'param')
                     .timestamp(timestamp) // TODO: Change to use GPS time
@@ -334,7 +337,7 @@ export default class DataController extends ParamsHandler {
                 this.last_imu_update = current_time
             })
 
-            this.imu.startPoll(20)
+            this.imu.startPoll(50)
         }
 
         if (this.co_mcu) {
@@ -354,7 +357,7 @@ export default class DataController extends ParamsHandler {
                 }
             })
 
-            /*this.co_mcu.on("ts_active", (ts_active) => {
+            this.co_mcu.on("ts_active", (ts_active) => {
                 if (this.params.system_state == MavState.STANDBY && ts_active == 1) {
                     this.main.setSystemState(MavState.ACTIVE)
                 } else if (this.params.system_state == MavState.ACTIVE && ts_active == 0) {
@@ -363,7 +366,7 @@ export default class DataController extends ParamsHandler {
                         this.main.traction_system_controller.onUnexpectedTSShutdown()
                     }
                 }
-            })*/
+            })
 
             this.co_mcu.on("ind_sensors", (data) => {
                 [this.params.ind_3_raw_freq, this.params.ind_2_raw_freq, this.params.ind_1_raw_freq] = data
@@ -394,6 +397,9 @@ export default class DataController extends ParamsHandler {
                 }
                 if (data.hasOwnProperty("satsActive")) {
                     this.params.gps_num_sats = data.satsActive
+                }
+                if (data.hasOwnProperty("satellites")) {
+                    this.params.gps_num_sats = data.satellites
                 }
                 if (data.hasOwnProperty("hdop")) {
                     this.params.gps_hdop = data.hdop
@@ -445,7 +451,6 @@ export default class DataController extends ParamsHandler {
                     this.params.gps_heading = data.heading
                 }
 
-
                 if (this.params.gps_mode == GpsFixType.NO_GPS) {
                     this.params.gps_mode = GpsFixType.NO_FIX
                 }
@@ -473,7 +478,8 @@ export default class DataController extends ParamsHandler {
         if (this.can_driver) {
             this.can_driver = new CanDriver()
             this.can_driver.on("data", (raw_data: number[]) => {
-                console.log(raw_data)
+                this.params.hv_cur_temp = Math.max(raw_data[1], raw_data[2]) / 100
+                //this.params.hv_cur_amp = raw_data[0] / 10
             })
         }
 

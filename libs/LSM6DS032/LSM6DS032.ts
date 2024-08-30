@@ -210,25 +210,35 @@ export default class LSM6DS032 extends EventEmitter {
     }
 
     get acceleration(): [number, number, number] {
-        if (this._raw_accel_data) {
-            const raw_accel_data = this._raw_accel_data.val
-            const x = raw_accel_data[0] * this.accel_range_convert[this.accel_range_cache] * this._MILLI_G_TO_ACCEL
-            const y = raw_accel_data[1] * this.accel_range_convert[this.accel_range_cache] * this._MILLI_G_TO_ACCEL
-            const z = raw_accel_data[2] * this.accel_range_convert[this.accel_range_cache] * this._MILLI_G_TO_ACCEL
-            return [x, y, z]
-        } else {
+        try {
+            if (this._raw_accel_data) {
+                const raw_accel_data = this._raw_accel_data.val
+                const x = raw_accel_data[0] * this.accel_range_convert[this.accel_range_cache] * this._MILLI_G_TO_ACCEL
+                const y = raw_accel_data[1] * this.accel_range_convert[this.accel_range_cache] * this._MILLI_G_TO_ACCEL
+                const z = raw_accel_data[2] * this.accel_range_convert[this.accel_range_cache] * this._MILLI_G_TO_ACCEL
+                return [x, y, z]
+            } else {
+                return [0, 0, 0]
+            }
+        } catch(e) {
+            this.emit("error", new Error("Error reading acceleration data, timeout."))
             return [0, 0, 0]
         }
     }
 
     get gyro(): [number, number, number] {
-        if (this._raw_gyro_data) {
-            const raw_gyro_data = this._raw_gyro_data.val
-            const x = raw_gyro_data[0] * this.gyro_ranges_convert[this.gyro_range_cache] * Math.PI / 180.0 / 1000
-            const y = raw_gyro_data[1] * this.gyro_ranges_convert[this.gyro_range_cache] * Math.PI / 180.0 / 1000
-            const z = raw_gyro_data[2] * this.gyro_ranges_convert[this.gyro_range_cache] * Math.PI / 180.0 / 1000
-            return [x, y, z]
-        } else {
+        try {
+            if (this._raw_gyro_data) {
+                const raw_gyro_data = this._raw_gyro_data.val
+                const x = raw_gyro_data[0] * this.gyro_ranges_convert[this.gyro_range_cache] * Math.PI / 180.0 / 1000
+                const y = raw_gyro_data[1] * this.gyro_ranges_convert[this.gyro_range_cache] * Math.PI / 180.0 / 1000
+                const z = raw_gyro_data[2] * this.gyro_ranges_convert[this.gyro_range_cache] * Math.PI / 180.0 / 1000
+                return [x, y, z]
+            } else {
+                return [0, 0, 0]
+            }
+        } catch (e) {
+            this.emit("error", new Error("Error reading gyro data, timeout."))
             return [0, 0, 0]
         }
     }
@@ -253,7 +263,7 @@ export default class LSM6DS032 extends EventEmitter {
 
     set gyro_range(value: string) {
         if (!Object.keys(this.gyro_ranges).includes(value)) {
-            throw Error("Range most be a gyro range")
+            this.emit("error", new Error("Range most be a rate range"))
         }
         if (this._gyro_range_125dps && this._gyro_range) {
             if (value == "RANGE_125_DPS") {
@@ -276,7 +286,7 @@ export default class LSM6DS032 extends EventEmitter {
 
     set accelerometer_data_rate(value: string) {
         if (!Object.keys(this.rate_range).includes(value)) {
-            throw Error("Range most be a rate range")
+            this.emit("error", new Error("Range most be a rate range"))
         }
         if (this._accel_data_rate) {
             this._accel_data_rate.val = this.rate_range[value]
@@ -292,18 +302,27 @@ export default class LSM6DS032 extends EventEmitter {
     }
 
     set gyro_data_rate(value: string) {
-        if (!Object.keys(this.rate_range).includes(value)) {
-            throw Error("Range most be a rate range")
-        }
-        if (this._gyro_data_rate) {
-            this._gyro_data_rate.val = this.rate_range[value]
+        try {
+            if (!Object.keys(this.rate_range).includes(value)) {
+                this.emit("error", new Error("Range most be a rate range"))
+            }
+            if (this._gyro_data_rate) {
+                this._gyro_data_rate.val = this.rate_range[value]
+            }
+        } catch (e) {
+            this.emit("error", new Error("Unknown error occurred!"))
         }
     }
 
     get temperature(): number {
-        if (this._raw_temp_data) {
-            return this._raw_temp_data.val[0] / this._TEMPERATURE_SENSITIVITY + this._TEMPERATURE_OFFSET
-        } else {
+        try {
+            if (this._raw_temp_data) {
+                return this._raw_temp_data.val[0] / this._TEMPERATURE_SENSITIVITY + this._TEMPERATURE_OFFSET
+            } else {
+                return 0
+            }
+        } catch (e) {
+            this.emit("error", new Error("Error reading temperature data, timeout."))
             return 0
         }
     }

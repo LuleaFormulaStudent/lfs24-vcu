@@ -146,34 +146,49 @@ export default class INA260 extends EventEmitter {
     }
 
     get current(): number {
-        if (this.initialized) {
-            if (this.mode?.val == this.TRIGGERED) {
-                while (!this._conversion_ready_flag?.val) {}
+        try {
+            if (this.initialized) {
+                if (this.mode?.val == this.TRIGGERED) {
+                    while (!this._conversion_ready_flag?.val) {}
+                }
+                return this._raw_current!.val * 1.25
+            } else {
+                return -1
             }
-            return this._raw_current!.val * 1.25
-        } else {
+        } catch (e) {
+            this.emit("error", new Error("Error reading current, timeout"))
             return -1
         }
     }
 
     get voltage(): number {
-        if (this.initialized) {
-            if (this.mode?.val == this.TRIGGERED) {
-                while (!this._conversion_ready_flag?.val) {}
+        try {
+            if (this.initialized) {
+                if (this.mode?.val == this.TRIGGERED) {
+                    while (!this._conversion_ready_flag?.val) {}
+                }
+                return this._raw_voltage!.val * 0.00125
+            } else {
+                return -1
             }
-            return this._raw_voltage!.val * 0.00125
-        } else {
+        } catch (e) {
+            this.emit("error", new Error("Error reading voltage, timeout"))
             return -1
         }
     }
 
     get power(): number {
         if (this.initialized) {
-            if (this.mode?.val == this.TRIGGERED) {
-                while (!this._conversion_ready_flag?.val) {}
+            if (this.initialized) {
+                if (this.mode?.val == this.TRIGGERED) {
+                    while (!this._conversion_ready_flag?.val) {}
+                }
+                return this._raw_power!.val * 10
+            } else {
+                return -1
             }
-            return this._raw_power!.val * 10
         } else {
+            this.emit("error", new Error("Error reading power. timeout"))
             return -1
         }
     }

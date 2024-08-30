@@ -55,13 +55,14 @@ export default class Main {
         await this.logs_controller.info("Version: " + this.version)
 
         if (this.in_production) {
-            const onExit = (err: any) => {
+            const onExit = async (err: any) => {
                 this.digital_outputs_controller.setCoolantPumpOutput(false)
                 this.digital_outputs_controller.setForwardSwitch(false)
                 this.digital_outputs_controller.setReverseSwitch(false)
 
                 if (this.data_controller.params.system_state == MavState.ACTIVE) {
-                    //this.traction_system_controller.deactivateTS()
+                    await this.traction_system_controller.deactivateTS()
+                    this.digital_outputs_controller.setTSActiveRelay(false)
                 }
 
                 this.status_led.setGreenLED(false)
@@ -70,8 +71,7 @@ export default class Main {
                     this.status_led.setRedLED(true)
                     console.error(err)
                 }
-                this.logs_controller.info("Exiting..")
-                process.exit(0)
+                await this.logs_controller.info("Exiting..")
             }
             process.on('exit', onExit);
             process.on('SIGINT', onExit);

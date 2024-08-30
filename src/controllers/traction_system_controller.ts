@@ -66,12 +66,10 @@ export default class TractionSystemController {
             /*if (!this.main.isInSystemMode(MavModeFlag.TEST_ENABLED) && this.main.data_controller.params.brake_input < 0.3) {
                 await this.main.logs_controller.info("Brakes is not applied!")
                 return false
-            }*/ // TODO: Reactivate this when testing is done
+            }*/ // TODO: Reactivate this when testing is done, needs to have a more stable brake signal
 
             await this.main.logs_controller.info("Trying to activate traction system..")
             this.main.digital_outputs_controller.setTSActiveRelay(true)
-
-            await this.main.setSystemState(MavState.ACTIVE) // TODO Remove this line later
 
             await waitFor(() => this.main.data_controller.params.system_state == MavState.ACTIVE, 5000, 100)
 
@@ -96,7 +94,6 @@ export default class TractionSystemController {
             await sleep(500)
             this.main.digital_outputs_controller.setTSActiveRelay(false)
 
-            await this.main.setSystemState(MavState.STANDBY)
             await waitFor(() => this.main.data_controller.params.system_state == MavState.STANDBY, 3000, 100)
             return true
         } catch (e) {
@@ -110,8 +107,8 @@ export default class TractionSystemController {
     }
 
     async onUnexpectedTSShutdown() {
-        this.main.setDrivingMode(DrivingMode.NEUTRAL)
-        await this.main.logs_controller.error("Traction system turned off, probably an error occurred!")
+        await this.main.logs_controller.error("Traction system unexpectedly turned off, probably an error occurred!")
+        await this.deactivateTS()
     }
 
     async doMotorTest(throttle:number, direction: DrivingMode, time: number) {

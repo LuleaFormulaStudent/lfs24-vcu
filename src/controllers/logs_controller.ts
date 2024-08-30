@@ -50,6 +50,9 @@ export default class LogsController {
     async log(text: string, severity: MavSeverity, log_fn = console.log, err: any = null,) {
         const date = new Date(Date.now())
         const severity_text = MavSeverity[severity].toString()
+        if (err) {
+            text += " " + (err.hasOwnProperty("msg")? err.msg: err.toString()).toString()
+        }
         log_fn(`[${this.formatCurrentDate(date)} ${this.getTime(date)}] [${severity_text}]`, text, err ? err : "")
         this.log_id++
         this.logs.push({id: this.log_id, severity: severity, text})
@@ -61,6 +64,9 @@ export default class LogsController {
         const log_text = `[${this.formatCurrentDate(date)} ${this.getTime(date)}] [${severity_text}] ` + text
         this.writeToFile(`main/full_` + this.formatCurrentDate(date) + ".log", log_text)
         this.writeToFile(`main/${severity_text.toLowerCase()}_` + this.formatCurrentDate(date) + ".log", log_text)
+        if (err) {
+            this.writeToFile(`main/error_` + this.formatCurrentDate(date) + ".log", err.toString())
+        }
     }
 
     async info(text: string) {
