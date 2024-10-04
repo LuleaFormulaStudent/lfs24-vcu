@@ -4,12 +4,9 @@ import {MavModeFlag} from "mavlink-mappings/dist/lib/minimal.js";
 
 export default class HILController {
 
-    server: Server
+    server: Server | null = null
 
-    constructor(private main: Main) {
-        this.server = createServer()
-
-    }
+    constructor(private main: Main) {}
 
     async init() {
         if (this.main.isInSystemMode(MavModeFlag.HIL_ENABLED)) {
@@ -21,6 +18,8 @@ export default class HILController {
     }
 
     async activateHIL() {
+        this.server = createServer()
+
         this.server.on('error', (err) => {
             this.main.logs_controller.error("HIL Server error:", err)
         });
@@ -59,6 +58,11 @@ export default class HILController {
                 this.main.data_controller.params.vehicle_steering = values[19]
                 this.main.data_controller.params.throttle_output = values[20]
                 this.main.data_controller.params.brake_input = values[21]
+                this.main.data_controller.params.hv_cur_amp = values[0]
+                this.main.data_controller.params.hv_cons_energy = values[1]
+                this.main.data_controller.params.hv_cur_voltage = values[3]
+                this.main.data_controller.params.hv_temp = values[4] - 273.15
+                this.main.data_controller.params.hv_bdi = values[5]
             })
 
             socket.on('close', () => {
@@ -68,11 +72,10 @@ export default class HILController {
 
         this.server.listen({port: 6000, host: "0.0.0.0"}, () => {
             this.main.logs_controller.info("HIL Server started!")
-            this.main.setSystemMode(MavModeFlag.HIL_ENABLED, true)
         });
     }
 
     deactivateHIL() {
-        this.main.setSystemMode(MavModeFlag.HIL_ENABLED, true)
+        this.main.setSystemMode(MavModeFlag.HIL_ENABLED, false)
     }
 }

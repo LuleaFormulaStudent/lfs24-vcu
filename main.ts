@@ -15,6 +15,7 @@ import {waitFor} from "node-mavlink";
 import {exec} from "node:child_process";
 import AdmZip from "adm-zip";
 import fs from "fs";
+import {DrivingModeMessage} from "mavlink-lib/dist/lfs.js"
 
 configDotenv()
 
@@ -53,6 +54,8 @@ export default class Main {
         await this.logs_controller.init()
         await this.logs_controller.info("Starting initialization of system..")
         await this.logs_controller.info("Version: " + this.version)
+        await this.setSystemState(MavState.BOOT)
+        this.setSystemMode(MavModeFlag.HIL_ENABLED, true)
 
         if (this.in_production) {
             const onExit = async (err: any) => {
@@ -84,17 +87,15 @@ export default class Main {
             await this.logs_controller.info("System is in development mode.")
         }
 
-        await this.setSystemState(MavState.BOOT)
-        this.setSystemMode(MavModeFlag.HIL_ENABLED, false)
-
         await this.logs_controller.info("Initializing TCP server..")
         this.tcp_server.on('error', (err) => {
             this.logs_controller.error("TCP Server error:", err)
         });
 
         if (!this.in_production) {
-            this.tcp_server.on('connection', async (socket) => {
+            this.tcp_server.on('connection', (socket) => {
                 this.tcp_server_connections.push(socket);
+
                 socket.on("error", (err) => {
                     this.logs_controller.error("Error on client socket", err)
                 })
@@ -110,6 +111,7 @@ export default class Main {
                 socket.on('close', () => {
                     this.tcp_server_connections.splice(this.tcp_server_connections.indexOf(socket), 1);
                 });
+                this.logs_controller.debug("New tcp connection.")
             });
 
             this.tcp_server.listen({port: 5432, host: "0.0.0.0"}, () => {
@@ -138,6 +140,10 @@ export default class Main {
         await this.logs_controller.info("Setting system in " + MavState[state].toLowerCase() + " state.")
     }
 
+    isInSystemState(state: MavState): boolean {
+        return this.data_controller.params.system_state == state
+    }
+
     get uptime(): number {
         return Date.now() - this.start_time
     }
@@ -151,23 +157,29 @@ export default class Main {
     }
 
     isInSystemMode(mode: MavModeFlag): boolean {
-        return (this.data_controller.params.system_state & mode) != 0
+        return (this.data_controller.params.system_mode & mode) != 0
     }
 
     setDrivingMode(mode: DrivingMode) {
         this.data_controller.params.driving_mode = mode
-        if (this.in_production) {
-            if (this.data_controller.params.driving_mode == DrivingMode.NEUTRAL) {
-                this.digital_outputs_controller.setReverseSwitch(false)
-                this.digital_outputs_controller.setForwardSwitch(false)
-            } else if (this.data_controller.params.driving_mode == DrivingMode.FORWARD) {
-                this.digital_outputs_controller.setReverseSwitch(false)
-                this.digital_outputs_controller.setForwardSwitch(true)
-            } else if (this.data_controller.params.driving_mode == DrivingMode.REVERSE) {
-                this.digital_outputs_controller.setForwardSwitch(false)
-                this.digital_outputs_controller.setReverseSwitch(true)
-            }
+        if (this.data_controller.params.driving_mode == DrivingMode.NEUTRAL) {
+            this.digital_outputs_controller.setReverseSwitch(false, false)
+            this.digital_outputs_controller.setForwardSwitch(false)
+        } else if (this.data_controller.params.driving_mode == DrivingMode.FORWARD) {
+            this.digital_outputs_controller.setReverseSwitch(false, false)
+            this.digital_outputs_controller.setForwardSwitch(true)
+        } else if (this.data_controller.params.driving_mode == DrivingMode.REVERSE) {
+            this.digital_outputs_controller.setForwardSwitch(false, false)
+            this.digital_outputs_controller.setReverseSwitch(true)
         }
+
+        const msg = new DrivingModeMessage()
+        msg.drivingMode = this.data_controller.params.driving_mode
+        this.mavlink_controller.send(msg).catch(async () => {
+            await this.logs_controller.error("Failed to send driving mode message!")
+        }).then(async () => {
+            await this.logs_controller.info("Setting vehicle in " + DrivingMode[mode].toLowerCase() + " mode.")
+        })
     }
 
     async handleNewFirmware(file_name: string) {

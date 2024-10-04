@@ -71,8 +71,12 @@ export default class TractionSystemController {
             await this.main.logs_controller.info("Trying to activate traction system..")
             this.main.digital_outputs_controller.setTSActiveRelay(true)
 
-            await waitFor(() => this.main.data_controller.params.system_state == MavState.ACTIVE, 5000, 100)
-
+            if (this.main.in_production) {
+                await waitFor(() => this.main.data_controller.params.system_state == MavState.ACTIVE, 5000, 100)
+            } else {
+                await sleep(1000)
+                await this.main.setSystemState(MavState.ACTIVE)
+            }
             await this.main.logs_controller.info("Traction system activated!")
             return true
         } catch (e) {
@@ -94,7 +98,13 @@ export default class TractionSystemController {
             await sleep(500)
             this.main.digital_outputs_controller.setTSActiveRelay(false)
 
-            await waitFor(() => this.main.data_controller.params.system_state == MavState.STANDBY, 3000, 100)
+            if (this.main.in_production) {
+                await waitFor(() => this.main.data_controller.params.system_state == MavState.STANDBY, 5000, 100)
+            } else {
+                await sleep(1000)
+                await this.main.setSystemState(MavState.STANDBY)
+            }
+
             return true
         } catch (e) {
             if (e == "Timeout") {
@@ -113,28 +123,43 @@ export default class TractionSystemController {
 
     async doMotorTest(throttle:number, direction: DrivingMode, time: number) {
         await this.main.mavlink_controller.sendCmdAck(common.MavCmd.DO_MOTOR_TEST, MavResult.IN_PROGRESS, 0)
-        await this.main.logs_controller.info("Starting motor test")
-        await this.main.logs_controller.info("Testing motor in " + DrivingMode[direction].toLowerCase() + "direction with throttle at " + throttle*100 + "% for " + time/1000 + " s.")
         this.main.setSystemMode(MavModeFlag.TEST_ENABLED, true)
-        if (this.main.in_production) {
-            if (await this.activateTS()) {
-                await this.main.logs_controller.info("Starting test!")
-                await sleep(500)
-                await this.main.setDrivingMode(direction)
-                this.main.data_controller.params.throttle_output = throttle
-                this.performing_motor_test = true
+        await this.main.logs_controller.info("Initiating motor test..")
 
-                this.motor_test_timeout = setTimeout(async () => {
-                    await this.deactivateTS()
-                    this.main.setSystemMode(MavModeFlag.TEST_ENABLED, false)
+        if (!this.main.isInSystemMode(MavModeFlag.TEST_ENABLED)) {
+            await this.main.logs_controller.warning("Could not set system to test mode, skipping motor test.")
+            await this.main.mavlink_controller.sendCmdAck(common.MavCmd.DO_MOTOR_TEST, MavResult.FAILED, 100)
+        }
+
+        await this.main.logs_controller.info("Testing motor in " + DrivingMode[direction].toLowerCase() + " direction with throttle at " + throttle*100 + "% for " + time/1000 + " s.")
+
+        if (await this.activateTS()) {
+            await this.main.logs_controller.info("Starting test!")
+            await sleep(500)
+            await this.main.setDrivingMode(direction)
+            this.main.data_controller.params.throttle_output = throttle
+            this.performing_motor_test = true
+
+            this.motor_test_timeout = setTimeout(async () => {
+                await this.main.logs_controller.info("Finishing motor..")
+                if (await this.deactivateTS()) {
                     await this.main.logs_controller.info("Motor test done!")
                     await this.main.mavlink_controller.sendCmdAck(common.MavCmd.DO_MOTOR_TEST, MavResult.ACCEPTED, 100)
-                    this.performing_motor_test = false
-                }, time)
-            } else {
-                await this.main.logs_controller.info("Could not activate TS, skipping motor test.")
-                await this.main.mavlink_controller.sendCmdAck(common.MavCmd.DO_MOTOR_TEST, MavResult.FAILED, 100)
-            }
+                } else {
+                    await this.main.logs_controller.info("Could not deactivate TS, something is wrong!")
+                    await this.main.mavlink_controller.sendCmdAck(common.MavCmd.DO_MOTOR_TEST, MavResult.FAILED, 100)
+                }
+                this.performing_motor_test = false
+                this.main.setSystemMode(MavModeFlag.TEST_ENABLED, false)
+            }, time)
+        } else {
+            await this.main.logs_controller.warning("Could not activate TS, skipping motor test.")
+            await this.main.mavlink_controller.sendCmdAck(common.MavCmd.DO_MOTOR_TEST, MavResult.FAILED, 100)
+            this.main.setSystemMode(MavModeFlag.TEST_ENABLED, false)
+        }
+
+        /*if (this.main.in_production) {
+
         } else {
             await this.main.logs_controller.info("Skipping activating TS because of not in production.")
             this.main.data_controller.params.throttle_output = throttle
@@ -146,31 +171,26 @@ export default class TractionSystemController {
                 await this.main.mavlink_controller.sendCmdAck(common.MavCmd.DO_MOTOR_TEST, MavResult.ACCEPTED, 100)
                 this.performing_motor_test = false
             }, time)
-        }
+        }*/
     }
 
     async abortMotorTest() {
-        if (this.performing_motor_test) {
+        if (this.performing_motor_test && this.main.isInSystemMode(MavModeFlag.TEST_ENABLED)) {
             await this.main.logs_controller.info("Aborting motor test..")
             if (this.motor_test_timeout) {
                 clearTimeout(this.motor_test_timeout)
             }
-            if (this.main.in_production) {
-                if (await this.deactivateTS()) {
-                    this.main.setSystemMode(MavModeFlag.TEST_ENABLED, false)
-                    await this.main.mavlink_controller.sendCmdAck(common.MavCmd.DO_MOTOR_TEST, MavResult.DENIED)
-                    await this.main.logs_controller.info("Aborting motor test done!")
-                } else {
-                    await this.main.mavlink_controller.sendCmdAck(common.MavCmd.DO_MOTOR_TEST, MavResult.FAILED)
-                    await this.main.logs_controller.info("Aborting motor test failed!")
-                }
-            } else {
+            if (await this.deactivateTS()) {
                 this.main.setSystemMode(MavModeFlag.TEST_ENABLED, false)
                 await this.main.mavlink_controller.sendCmdAck(common.MavCmd.DO_MOTOR_TEST, MavResult.DENIED)
                 await this.main.logs_controller.info("Aborting motor test done!")
+            } else {
+                await this.main.mavlink_controller.sendCmdAck(common.MavCmd.DO_MOTOR_TEST, MavResult.FAILED)
+                await this.main.logs_controller.info("Aborting motor test failed!")
             }
         } else {
             await this.main.logs_controller.info("No motor test is going on..")
+            this.main.setSystemMode(MavModeFlag.TEST_ENABLED, false)
         }
     }
 }

@@ -8,9 +8,9 @@ import {
     MavLinkProtocolV2,
     minimal,
     registerCustomMessageMagicNumber,
-    send
+    send, waitFor
 } from 'node-mavlink'
-import {Readable, Writable} from "node:stream";
+import {Writable} from "node:stream";
 import {MavAutopilot, MavModeFlag, MavType} from "mavlink-mappings/dist/lib/minimal.js";
 import {Heartbeat} from "node-mavlink-heartbeat";
 import {MavLinkData} from "mavlink-mappings";
@@ -42,6 +42,7 @@ export default class MavlinkController {
     SYS_ID = 1
     COMP_ID = 1
     port: SerialPort | Socket | null = null
+    pipe: any | null = null
 
     heartbeat: Heartbeat | null = null
     ftp: MavFTP | null = null
@@ -54,7 +55,7 @@ export default class MavlinkController {
 
     port_ready = false
 
-    send_mav_messages = false
+    private send_mav_messages = false
     mav_messages_interval_times: { [propName: number]: number } = {}
     mav_messages_intervals: { [propName: number]: any } = {}
 
@@ -82,7 +83,6 @@ export default class MavlinkController {
             this.port = connect({host: '0.0.0.0', port: 5432})
         }
 
-        this.ftp = new MavFTP(<Writable>this.port, {protocol: this.mavlink_protocol})
         this.heartbeat = new Heartbeat(<Writable>this.port, {protocol: this.mavlink_protocol})
 
         this.heartbeat.type = MavType.GROUND_ROVER
@@ -91,12 +91,13 @@ export default class MavlinkController {
         this.heartbeat.systemStatus = this.main.data_controller.params.system_state
 
         try {
-            this.port
+            this.pipe = this.port
                 .pipe(new MavLinkPacketSplitter())
                 .pipe(new MavLinkPacketParser())
                 .pipe(this.heartbeat)
-                .pipe(this.ftp)
-                .on('data', async (packet: MavLinkPacket) => {
+                .resume()
+
+            this.pipe.on('data', async (packet: MavLinkPacket) => {
                     try {
                         const clazz: MavLinkDataConstructor<MavLinkData> = this.REGISTRY[packet.header.msgid]
                         if (clazz) {
@@ -104,7 +105,6 @@ export default class MavlinkController {
                             //@ts-ignore
                             if (packet.protocol.hasOwnProperty("sysid") && packet.protocol["sysid"] == 254 && !this.send_mav_messages) {
                                 this.send_mav_messages = true
-                                this.setupMAVMessages()
                             }
                             //@ts-ignore
                             if (packet_data.hasOwnProperty("targetSystem") && packet_data["targetSystem"]! == this.SYS_ID && packet_data.hasOwnProperty("targetComponent") && packet_data["targetComponent"] == this.COMP_ID) {
@@ -117,7 +117,7 @@ export default class MavlinkController {
                         await this.main.logs_controller.error("Error with data parsing:", e)
                     }
                 })
-                .on("error", (err) => {
+                .on("error", (err: any) => {
                     this.main.logs_controller.error("Pipeline Error:", err)
                 })
         } catch (e) {
@@ -141,9 +141,7 @@ export default class MavlinkController {
         this.heartbeat!.start()
         this.port_ready = true
 
-        if (this.send_mav_messages) {
-            this.setupMAVMessages()
-        }
+        this.setupMAVMessages()
     }
 
     setupMAVMessages() {
@@ -156,7 +154,7 @@ export default class MavlinkController {
         this.createMsgInterval(ComputerStatus.MSG_ID, 1000)
     }
 
-    async send(msg: MavLinkData | MavLinkData[], wait_time: number = 10): Promise<boolean> {
+    async send(msg: MavLinkData | MavLinkData[], wait_for_next: number = 10): Promise<boolean> {
         if (this.port_ready) {
             if (msg instanceof MavLinkData) {
                 try {
@@ -174,7 +172,7 @@ export default class MavlinkController {
                 for (const m of msg) {
                     try {
                         await this.send(m)
-                        await sleep(wait_time)
+                        await sleep(wait_for_next)
                     } catch (e) {
                         await this.main.logs_controller.error("Error when sending msg (" + msg.constructor.name + "): ", e)
                         return false
@@ -194,6 +192,40 @@ export default class MavlinkController {
         msg.command = command
         msg.progress = progress
         await this.send(msg)
+    }
+
+    async sendWithAnswer(msg: MavLinkData, exp_resp: any, timeout: number = 1000): Promise<MavLinkData | null> {
+        return new Promise(async (resolve, reject) => {
+            if (this.pipe != null) {
+                let got_event = false;
+                let data: MavLinkData | null = null
+
+                const listener = (packet: MavLinkPacket) => {
+                    const clazz: MavLinkDataConstructor<MavLinkData> = this.REGISTRY[packet.header.msgid]
+                    if (clazz) {
+                        data = packet.protocol.data(packet.payload, clazz)
+                        if (data instanceof exp_resp) {
+                            got_event = true
+                        } else {
+                            this.pipe!.once("data", listener)
+                        }
+                    } else {
+                        this.pipe!.once("data", listener)
+                    }
+                }
+                this.pipe.once("data", listener)
+                try {
+                    await this.send(msg)
+                    await waitFor(() => got_event, timeout, 50)
+                    resolve(data)
+                } catch (e) {
+                    this.pipe.removeListener("data", listener)
+                    resolve(null)
+                }
+            } else {
+                resolve(null)
+            }
+        })
     }
 
     async handle_packet(data: MavLinkData) {
@@ -223,7 +255,7 @@ export default class MavlinkController {
                 if (data._param3 == 0) {
                     await this.main.traction_system_controller.abortMotorTest()
                 } else {
-                    await this.main.traction_system_controller.doMotorTest(data._param3 / 100, data._param3 > 0 ? DrivingMode.FORWARD : DrivingMode.REVERSE, data._param4 * 1000)
+                    await this.main.traction_system_controller.doMotorTest(Math.abs(data._param3 / 100), data._param3 > 0 ? DrivingMode.FORWARD : DrivingMode.REVERSE, data._param4 * 1000)
                 }
             } else {
                 await this.sendCmdAck(common.MavCmd.DO_MOTOR_TEST, MavResult.UNSUPPORTED)
@@ -239,7 +271,13 @@ export default class MavlinkController {
             await this.send(data)
         } else if (data instanceof common.FileTransferProtocol) {
             await this.onFTPEvent(data)
-        } else {
+        } else if (data instanceof common.CommandLong && data.command == common.MavCmd.LOGGING_START) {
+            await this.main.data_controller.startSendingDataLog(data._param1)
+        } else if (data instanceof common.CommandLong && data.command == common.MavCmd.LOGGING_STOP) {
+            await this.main.data_controller.stopSendingDataLog()
+        } else if (data instanceof common.LoggingData) {
+            await this.main.data_controller.sendLoggingDataList()
+        } else if (!(data instanceof common.LoggingAck)){
             await this.main.logs_controller.warning('Received packet:' + data.toString())
         }
     }
@@ -279,6 +317,15 @@ export default class MavlinkController {
         this.mav_messages_interval_times[msg_id] = interval
     }
 
+    shouldSendMavMessages(val: boolean) {
+        this.send_mav_messages = val
+        if (this.send_mav_messages) {
+            this.main.logs_controller.debug("Start sending mav messages.")
+        } else {
+            this.main.logs_controller.debug("Stopping sending mav messages.")
+        }
+    }
+
     private createFromMsgID(msg_id: number): MavLinkData | MavLinkData[] | null {
         try {
             switch (msg_id) {
@@ -289,7 +336,7 @@ export default class MavlinkController {
                     lv_battery_msg.type = MavBatteryType.LIFE
                     lv_battery_msg.batteryRemaining = Math.round(this.main.data_controller.params.lv_bdi * 100)
                     lv_battery_msg.chargeState = MavBatteryChargeState.UNDEFINED
-                    lv_battery_msg.currentBattery = this.main.data_controller.params.lv_cur_amp*100
+                    lv_battery_msg.currentBattery = this.main.data_controller.params.lv_cur_amp*10
                     lv_battery_msg.timeRemaining = 0
                     lv_battery_msg.temperature = this.main.data_controller.params.lv_cur_temp * 100
                     lv_battery_msg.currentConsumed = this.main.data_controller.params.lv_cons_cap*1000
@@ -303,7 +350,7 @@ export default class MavlinkController {
                     hv_battery_msg.type = MavBatteryType.LIFE
                     hv_battery_msg.batteryRemaining = Math.round(this.main.data_controller.params.hv_bdi * 100)
                     hv_battery_msg.chargeState = MavBatteryChargeState.UNDEFINED
-                    hv_battery_msg.currentBattery = this.main.data_controller.params.hv_cur_amp*100
+                    hv_battery_msg.currentBattery = this.main.data_controller.params.hv_cur_amp*10
                     hv_battery_msg.timeRemaining = 0
                     hv_battery_msg.temperature = this.main.data_controller.params.hv_cur_temp * 100
                     hv_battery_msg.currentConsumed = this.main.data_controller.params.hv_cons_cap*1000

@@ -4,7 +4,6 @@ import RWBit from "../LSM6DS032/rwbit.js";
 import RWBits from "../LSM6DS032/rwbits.js";
 import ROBits from "../LSM6DS032/robits.js";
 import os from "os";
-import {sleep} from "../../src/helper_functions.js";
 import EventEmitter from "node:events";
 import ROBit from "../LSM6DS032/robit.js";
 

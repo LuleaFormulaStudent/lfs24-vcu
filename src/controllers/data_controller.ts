@@ -4,8 +4,8 @@ import Main from "../../main.js";
 import {MavModeFlag, MavState} from "mavlink-mappings/dist/lib/minimal.js";
 import {common} from "node-mavlink";
 import ParamsHandler from "../params_handler.js";
-import {InfluxDB, Point, WriteApi} from "@influxdata/influxdb-client";
-import {map_range} from "../helper_functions.js";
+import {InfluxDB, Point, QueryApi, WriteApi} from "@influxdata/influxdb-client";
+import {map_range, sleep} from "../helper_functions.js";
 import {DrivingMode} from "mavlink-lib/dist/lfs.js";
 import {GpsFixType} from "mavlink-mappings/dist/lib/common.js";
 import LSM6DS032 from "../../libs/LSM6DS032/LSM6DS032.js";
@@ -13,6 +13,9 @@ import SystemInfo, {SystemInfoData} from "../../libs/system_info/system_info.js"
 import GPSDriver, {GGAQuality} from "../../libs/gps/gps_driver.js";
 import INA260 from "../../libs/ina260/ina260.js";
 import CanDriver from "../../libs/can_driver.js";
+import {exec} from "node:child_process";
+import {encode} from "@msgpack/msgpack";
+import {deflateRawSync} from "node:zlib";
 
 export const INT16_MAX = 2 ** 15 - 1
 export const INT32_MAX = 2 ** 31 - 1
@@ -27,7 +30,8 @@ export default class DataController extends ParamsHandler {
     system_info: SystemInfo
     can_driver: CanDriver | null = null
 
-    inlfuxdb_client: WriteApi
+    inlfuxdb_write_client: WriteApi
+    inlfuxdb_query_client: QueryApi
     measurement_name: string
 
     readonly FREQ_TO_VELOCITY_CONST = Math.PI * 2 / 24
@@ -39,6 +43,10 @@ export default class DataController extends ParamsHandler {
     previous_ina_current: number = 0
 
     history_points_cache: Point[] = []
+
+    gps_time_set = false
+
+    stop_sending_logging_data = false
 
     constructor(private main: Main) {
         super({
@@ -281,11 +289,11 @@ export default class DataController extends ParamsHandler {
 
         this.measurement_name = "drive_" + new Date(Date.now()).toISOString()
 
-        this.inlfuxdb_client = inlfuxdb.getWriteApi(process.env.DOCKER_INFLUXDB_INIT_ORG || "", process.env.DOCKER_INFLUXDB_INIT_BUCKET || "", 'ms')
+        this.inlfuxdb_write_client = inlfuxdb.getWriteApi(process.env.DOCKER_INFLUXDB_INIT_ORG || "", process.env.DOCKER_INFLUXDB_INIT_BUCKET || "", 'ms')
+        this.inlfuxdb_query_client = inlfuxdb.getQueryApi(process.env.DOCKER_INFLUXDB_INIT_ORG || "")
     }
 
     async init() {
-        await this.main.logs_controller.debug("Initializing data controller..")
         this.on("error", (err) => {
             this.main.logs_controller.error("Error with data:", err)
         })
@@ -295,14 +303,14 @@ export default class DataController extends ParamsHandler {
 
         setInterval(() => {
             if (this.history_points_cache.length) {
-                this.inlfuxdb_client.writePoints(this.history_points_cache)
-                this.inlfuxdb_client.flush()
+                this.inlfuxdb_write_client.writePoints(this.history_points_cache)
+                this.inlfuxdb_write_client.flush()
                 this.history_points_cache = []
             }
         }, 100)
 
         this.on("change", ({param, value, timestamp}) => {
-            if (this.params.system_state == MavState.ACTIVE) {
+            if (this.main.isInSystemState(MavState.ACTIVE) && !this.main.isInSystemMode(MavModeFlag.TEST_ENABLED)) {
                 let point = new Point(this.measurement_name)
                     .tag('type', 'param')
                     .timestamp(timestamp) // TODO: Change to use GPS time
@@ -383,6 +391,13 @@ export default class DataController extends ParamsHandler {
             this.gps.on("data", (data: any) => {
                 if (data.hasOwnProperty("time")) {
                     this.params.gps_time = (data.time as Date).getTime()
+                    if (!this.gps_time_set) {
+                        exec('date -s "' + data.time.toString() + '"', async (error) => {
+                            if (error) throw error;
+                            await this.main.logs_controller.info("Set system time to " + data.time.toLocaleString());
+                            this.gps_time_set = true
+                        });
+                    }
                 }
                 if (data.hasOwnProperty("lat") && data.hasOwnProperty("lon")) {
                     this.params.gps_latitude = data.lat
@@ -479,7 +494,7 @@ export default class DataController extends ParamsHandler {
             this.can_driver = new CanDriver()
             this.can_driver.on("data", (raw_data: number[]) => {
                 this.params.hv_cur_temp = Math.max(raw_data[1], raw_data[2]) / 100
-                //this.params.hv_cur_amp = raw_data[0] / 10
+                //this.params.hv_cur_amp = raw_data[0] / 10 // TODO re-add this after checking why this is not working
             })
         }
 
@@ -528,10 +543,145 @@ export default class DataController extends ParamsHandler {
         }
 
         if (this.params.gps_speed > 1) {
-            vehicle_speed += this.params.gps_speed
+            vehicle_speed += this.params.gps_speed//*3.6
             speeds_used++
         }
 
         this.params.vehicle_speed = Math.round(vehicle_speed / (speeds_used == 0 ? 1 : speeds_used))
+    }
+
+    async startSendingDataLog(log_id: number) {
+        this.stop_sending_logging_data = false
+        const measurements = await this.getMeasurements()
+        const drive = measurements[log_id]
+        await this.main.logs_controller.info("Got request for transferring data log: " + drive)
+        const fluxQuery = `from(bucket:"${process.env.DOCKER_INFLUXDB_INIT_BUCKET}") |> range(start: 0) |> filter(fn: (r) => r._measurement == "${drive}")`
+        const data_obj: { [propName: string]: { t: string | number, v: number }[] } = {}
+        for await (const {values, tableMeta} of this.inlfuxdb_query_client.iterateRows(fluxQuery)) {
+            const o = tableMeta.toObject(values)
+            if (!data_obj.hasOwnProperty(o._field)) {
+                data_obj[o._field] = []
+            } else {
+                data_obj[o._field].push({t: o._time, v: o._value})
+            }
+        }
+
+        let lowest_time = 1e20
+        for (const key of Object.keys(data_obj)) {
+            data_obj[key] = data_obj[key].map(({t, v}: { t: string | number, v: number }) => {
+                const time = new Date(t).getTime()
+                if (time < lowest_time) {
+                    lowest_time = time
+                }
+                return {t: time, v}
+            })
+        }
+
+        for (const key of Object.keys(data_obj)) {
+            data_obj[key] = data_obj[key].map(({t, v}: { t: string | number, v: number }) => {
+                return {t: <number>t - lowest_time, v}
+            })
+        }
+
+        const chunk_size = 249
+        const data_buffer = deflateRawSync(encode(data_obj))
+        const chunks = Math.ceil(data_buffer.byteLength / chunk_size)
+
+        await this.main.logs_controller.info("Start transferring log..")
+
+        const init_msg = new common.LoggingDataAcked()
+        init_msg.data = Array.from(encode({packets: chunks}))
+        init_msg.targetSystem = 253
+        init_msg.targetComponent = 1
+        init_msg.length = init_msg.data.length
+        init_msg.firstMessageOffset = 0
+        init_msg.sequence = 0
+        const response = await this.main.mavlink_controller.sendWithAnswer(init_msg, common.LoggingAck)
+        if (response != null) {
+            let succeeded = true
+            this.main.mavlink_controller.shouldSendMavMessages(false)
+            let tri = 0
+            for (let i = 0; i <= chunks;) {
+                if (this.stop_sending_logging_data) {
+                    await this.main.logs_controller.info("Stopped sending logging data.")
+                    succeeded = false
+                    break;
+                }
+                let data_chunk: Uint8Array = new Uint8Array()
+                const msg = new common.LoggingDataAcked()
+                if (i < chunks) {
+                    data_chunk = new Uint8Array(data_buffer.subarray(i * chunk_size, (i + 1) * chunk_size))
+                }
+                msg.data = i < chunks ? Array.from(data_chunk) : []
+                msg.targetSystem = 253
+                msg.targetComponent = 1
+                msg.length = i < chunks ? data_chunk.length : 0
+                msg.firstMessageOffset = i % 255
+                msg.sequence = i % 255
+                const response = await this.main.mavlink_controller.sendWithAnswer(msg, common.LoggingAck)
+                if (response) {
+                    if (msg.sequence == i % 255) {
+                        i++
+                        tri = 1
+                    } else {
+                        tri++
+                    }
+                } else if (tri > 5) {
+                    await this.main.logs_controller.error("Sending data logg failed after 5 tries.")
+                    succeeded = false
+                    break;
+                } else {
+                    tri++
+                }
+
+                if (this.main.in_production) {
+                    await sleep(5)
+                }
+            }
+            if (succeeded) {
+                await this.main.logs_controller.info("Transferred data log succeeded!")
+            }
+        } else {
+            await this.main.logs_controller.error("Failed to send info packet, skipping the rest.")
+        }
+
+        this.main.mavlink_controller.shouldSendMavMessages(true)
+    }
+
+    private async getMeasurements(): Promise<string[]> {
+        const measurements: string[] = []
+        const fluxQuery = `
+            import "influxdata/influxdb/schema"
+            schema.measurements(bucket:"${process.env.DOCKER_INFLUXDB_INIT_BUCKET}")
+        `
+        for await (const {values, tableMeta} of this.inlfuxdb_query_client.iterateRows(fluxQuery)) {
+            const o = tableMeta.toObject(values)
+            measurements.push(o._value)
+        }
+        return measurements
+    }
+
+    async sendLoggingDataList() {
+        await this.main.logs_controller.info("Got request for transferring data log list.")
+
+        return await this.main.mavlink_controller.send(await this.getMeasurements().then((measurements) => measurements
+            .map((measurement, index) => {
+                const msg = new common.LoggingData()
+                msg.data = Array.from(encode({
+                    id: index,
+                    date: new Date(measurement.substring(measurement.indexOf("_") + 1)).getTime()
+                }))
+                msg.sequence = index
+                msg.length = msg.data.length
+                msg.firstMessageOffset = index
+                msg.targetSystem = 1
+                msg.targetComponent = 1
+                return msg
+            })))
+    }
+
+    async stopSendingDataLog() {
+        await this.main.logs_controller.info("Stopping..")
+        this.stop_sending_logging_data = true
     }
 }
