@@ -7,7 +7,7 @@ import MavlinkController from "./src/controllers/mavlink_controller.js";
 import {MavModeFlag, MavState} from "mavlink-mappings/dist/lib/minimal.js";
 import {createServer, Server, Socket} from "node:net";
 import LogsController from "./src/controllers/logs_controller.js";
-import package_info from "./package.json" assert {type: "json"};
+import package_info from "./package.json"
 import {configDotenv} from "dotenv";
 import HILController from "./src/controllers/hil_controller.js";
 import {DrivingMode} from "mavlink-lib/dist/lfs.js";
@@ -55,7 +55,6 @@ export default class Main {
         await this.logs_controller.info("Starting initialization of system..")
         await this.logs_controller.info("Version: " + this.version)
         await this.setSystemState(MavState.BOOT)
-        this.setSystemMode(MavModeFlag.HIL_ENABLED, true)
 
         if (this.in_production) {
             const onExit = async (err: any) => {
@@ -85,42 +84,13 @@ export default class Main {
             await this.logs_controller.info("System is in production mode.")
         } else {
             await this.logs_controller.info("System is in development mode.")
+            this.setSystemMode(MavModeFlag.HIL_ENABLED, true)
         }
 
         await this.logs_controller.info("Initializing TCP server..")
         this.tcp_server.on('error', (err) => {
             this.logs_controller.error("TCP Server error:", err)
         });
-
-        if (!this.in_production) {
-            this.tcp_server.on('connection', (socket) => {
-                this.tcp_server_connections.push(socket);
-
-                socket.on("error", (err) => {
-                    this.logs_controller.error("Error on client socket", err)
-                })
-
-                socket.on("data", (data) => {
-                    this.tcp_server_connections.forEach((connection) => {
-                        if (connection !== socket) {
-                            connection.write(data);
-                        }
-                    });
-                })
-
-                socket.on('close', () => {
-                    this.tcp_server_connections.splice(this.tcp_server_connections.indexOf(socket), 1);
-                });
-                this.logs_controller.debug("New tcp connection.")
-            });
-
-            this.tcp_server.listen({port: 5432, host: "0.0.0.0"}, () => {
-                this.logs_controller.info("TCP Server started!")
-                this.tcp_server_stared = true
-            });
-
-            await waitFor(() => this.tcp_server_stared, 1000)
-        }
 
         await this.data_controller.init()
         await this.digital_outputs_controller.init()

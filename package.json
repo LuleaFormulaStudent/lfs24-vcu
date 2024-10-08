@@ -3,12 +3,13 @@
     "version": "1.2.0",
     "description": "Control software and system for LFS24 Project car",
     "main": "main.ts",
-    "type": "module",
+    "type": "commonjs",
     "scripts": {
         "dev": "dotenv -- node --loader ts-node/esm --experimental-specifier-resolution=node main.ts",
         "prod": "node dist/main.js",
         "build": "tsc --project tsconfig.json",
-        "build-firmware": "node tools/build_firmware.js"
+        "build-firmware": "node tools/build_firmware.js",
+        "build-pkg": "pkg -c package.json --public-packages \"*\" dist/main.js"
     },
     "author": "Erik Landmark",
     "license": "ISC",
@@ -16,11 +17,8 @@
         "@aksel/structjs": "^1.0.0",
         "@influxdata/influxdb-client": "^1.35.0",
         "@msgpack/msgpack": "^3.0.0-beta2",
-        "@types/adm-zip": "^0.5.5",
-        "@types/node-localstorage": "^1.3.3",
         "adm-zip": "^0.5.15",
         "dotenv": "^16.4.5",
-        "dotenv-cli": "^7.4.2",
         "gps": "^0.6.1",
         "i2c-bus": "^5.2.3",
         "mavlink-lib": "git+https://git@gitlab.luleafs.se/lfs2024/mavlink-lib",
@@ -42,6 +40,23 @@
         "@types/node": "^20.16.0",
         "@types/node-os-utils": "^1.3.4",
         "@types/ws": "^8.5.12",
+        "@types/adm-zip": "^0.5.5",
+        "@types/node-localstorage": "^1.3.3",
+        "dotenv-cli": "^7.4.2",
         "ts-node-dev": "^2.0.0"
+    },
+    "pkg": {
+        "targets": [
+            "node16-linux-arm64",
+            "node16-linux-x64",
+            "node16-windows-x64"
+        ],
+        "outputPath": "dist",
+        "compress": "Gzips",
+        "options": ["max_old_space_size=4096"],
+        "assets": [
+            "node_modules\\epoll\\build\\Release\\*",
+            "node_modules\\@serialport\\bindings-cpp\\*"
+        ]
     }
 }

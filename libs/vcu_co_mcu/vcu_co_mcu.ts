@@ -1,7 +1,6 @@
 import {I2CBus, openSync} from "i2c-bus";
 import os from "os";
 import EventEmitter from "node:events";
-import {sleep} from "node-mavlink";
 
 export default class VCUCoMcu extends EventEmitter {
     private i2c_device: I2CBus | null = null
@@ -20,14 +19,13 @@ export default class VCUCoMcu extends EventEmitter {
     startPoll(analog_interval: number = 10, ind_interval: number = 200) {
         this.analog_interval = setInterval(async () => {
             if (this.initialized) {
-                this.read_ts_active()
-                await sleep(analog_interval)
                 this.read_analog_sensors()
             }
-        }, analog_interval*2)
+        }, analog_interval)
 
         this.ind_interval = setInterval(async () => {
             if (this.initialized) {
+                this.read_ts_active()
                 this.read_ind_sensors()
             }
         }, ind_interval)

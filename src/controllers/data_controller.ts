@@ -384,7 +384,7 @@ export default class DataController extends ParamsHandler {
                 this.calculateVehicleSpeed()
             })
 
-            this.co_mcu.startPoll(50, 200)
+            this.co_mcu.startPoll(40, 200)
         }
 
         if (this.gps) {
@@ -487,7 +487,7 @@ export default class DataController extends ParamsHandler {
                 this.last_imu_update = current_time
             })
 
-            this.ina.startPoll(50)
+            this.ina.startPoll(100)
         }
 
         if (this.can_driver) {
