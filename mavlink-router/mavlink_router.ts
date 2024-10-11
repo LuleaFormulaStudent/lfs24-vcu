@@ -39,7 +39,7 @@ export default class Mavlink_router {
     }[] = []
 
     slow_connections_backlog: { [propName: string]: { msg: MavLinkData, packet: MavLinkPacket }[] } = {}
-    slow_connection_interval = parseInt(process.env.MLR_SLOW_CONNECTION_INTERVAL)
+    slow_connection_interval = parseInt(process.env.MLR_SLOW_CONNECTION_INTERVAL || "15")
 
     REGISTRY: MavLinkPacketRegistry = {
         ...minimal.REGISTRY,
