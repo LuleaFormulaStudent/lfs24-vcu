@@ -1,0 +1,10 @@
+node_modules
+old
+data
+package-lock.json
+README.md
+.idea
+.git
+lfs24-vcu.iml
+.gitignore
+.gitlab-ci.yml

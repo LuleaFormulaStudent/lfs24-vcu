@@ -1,6 +1,6 @@
 import {I2CBus} from "i2c-bus";
 import * as structjs from "@aksel/structjs"
-import {toArrayBuffer} from "../../src/helper_functions.js";
+import {toArrayBuffer} from "../helper_functions.js";
 const struct = structjs.default
 
 export default class Struct {

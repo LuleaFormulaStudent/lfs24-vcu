@@ -1,4 +1,3 @@
-import {SerialPort} from "serialport";
 import {
     common,
     MavLinkDataConstructor,
@@ -8,14 +7,15 @@ import {
     MavLinkProtocolV2,
     minimal,
     registerCustomMessageMagicNumber,
-    send, waitFor
+    send,
+    waitFor
 } from 'node-mavlink'
 import {Writable} from "node:stream";
-import {MavAutopilot, MavModeFlag, MavType} from "mavlink-mappings/dist/lib/minimal.js";
+import {MavAutopilot, MavComponent, MavModeFlag, MavType} from "mavlink-mappings/dist/lib/minimal.js";
 import {Heartbeat} from "node-mavlink-heartbeat";
 import {MavLinkData} from "mavlink-mappings";
 import {FileTransferProtocolPayloadSerializer, MavFTP} from "node-mavlink-ftp";
-import Main from "../../main.js";
+import Main from "../main.js";
 import {connect, Socket} from "node:net";
 import {MavLinkPacket} from "node-mavlink/dist/lib/mavlink.js";
 import {
@@ -27,7 +27,6 @@ import {
     MavParamType,
     MavResult
 } from "mavlink-mappings/dist/lib/common.js";
-import {sleep} from "../helper_functions.js";
 import {BrakeData, ComputerStatus, DrivingMode, REGISTRY, ThrottleData, VehicleData} from "mavlink-lib/dist/lfs.js"
 import fs from "fs";
 import fsPromises from "fs/promises"
@@ -40,8 +39,8 @@ const UINT8_MAX = 2 ** 8 - 1
 export default class MavlinkController {
 
     SYS_ID = 1
-    COMP_ID = 1
-    port: SerialPort | Socket | null = null
+    COMP_ID: MavComponent = MavComponent.AUTOPILOT1
+    port: Socket | null = null
     pipe: any | null = null
 
     heartbeat: Heartbeat | null = null
@@ -55,7 +54,7 @@ export default class MavlinkController {
 
     port_ready = false
 
-    private send_mav_messages = false
+    private send_mav_messages = true
     mav_messages_interval_times: { [propName: number]: number } = {}
     mav_messages_intervals: { [propName: number]: any } = {}
 
@@ -77,12 +76,7 @@ export default class MavlinkController {
     async init() {
         await this.main.logs_controller.debug("Mavlink controller starting initializing!")
 
-        if (this.main.in_production) {
-            this.port = new SerialPort({path: "/dev/ttyAMA2", baudRate: 57600});
-        } else {
-            this.port = connect({host: '0.0.0.0', port: 5432})
-        }
-
+        this.port = connect({host: 'host.docker.internal', port: 5432})
         this.heartbeat = new Heartbeat(<Writable>this.port, {protocol: this.mavlink_protocol})
 
         this.heartbeat.type = MavType.GROUND_ROVER
@@ -98,25 +92,27 @@ export default class MavlinkController {
                 .resume()
 
             this.pipe.on('data', async (packet: MavLinkPacket) => {
-                    try {
-                        const clazz: MavLinkDataConstructor<MavLinkData> = this.REGISTRY[packet.header.msgid]
-                        if (clazz) {
-                            const packet_data = packet.protocol.data(packet.payload, clazz)
-                            //@ts-ignore
-                            if (packet.protocol.hasOwnProperty("sysid") && packet.protocol["sysid"] == 254 && !this.send_mav_messages) {
-                                this.send_mav_messages = true
+                try {
+                    const clazz: MavLinkDataConstructor<MavLinkData> = this.REGISTRY[packet.header.msgid]
+                    if (clazz) {
+                        const packet_data = packet.protocol.data(packet.payload, clazz)
+
+                        const target_system: number = "targetSystem" in packet_data ? packet_data["targetSystem"] as any : 0
+                        const target_component: MavComponent = "targetComponent" in packet_data ? packet_data["targetComponent"] as any : MavComponent.ALL
+
+                        //await this.main.logs_controller.debug(`Got ${packet_data.constructor.name} from: ${packet.header.sysid}|${packet.header.compid} to ${target_system}|${target_component}`)
+                        if (target_system > 0) {
+                            if (target_system == this.SYS_ID && (target_component == MavComponent.ALL || target_component == this.COMP_ID)) {
+                                await this.handle_packet(packet_data, packet.header.sysid, packet.header.compid)
                             }
-                            //@ts-ignore
-                            if (packet_data.hasOwnProperty("targetSystem") && packet_data["targetSystem"]! == this.SYS_ID && packet_data.hasOwnProperty("targetComponent") && packet_data["targetComponent"] == this.COMP_ID) {
-                                await this.handle_packet(packet_data)
-                            } else {
-                                await this.handle_packet(packet_data)
-                            }
+                        } else {
+                            await this.handle_packet(packet_data, packet.header.sysid, packet.header.compid)
                         }
-                    } catch (e) {
-                        await this.main.logs_controller.error("Error with data parsing:", e)
                     }
-                })
+                } catch (e) {
+                    await this.main.logs_controller.error("Error with data parsing:", e)
+                }
+            })
                 .on("error", (err: any) => {
                     this.main.logs_controller.error("Pipeline Error:", err)
                 })
@@ -124,15 +120,9 @@ export default class MavlinkController {
             console.error(e)
         }
 
-        if (this.port instanceof SerialPort) {
-            this.port.on('open', () => {
-                this.on_port_ready()
-            })
-        } else {
-            this.port.on('connect', () => {
-                this.on_port_ready()
-            })
-        }
+        this.port.on('connect', () => {
+            this.on_port_ready()
+        })
 
         await this.main.logs_controller.debug("Mavlink controller initialized!")
     }
@@ -141,10 +131,6 @@ export default class MavlinkController {
         this.heartbeat!.start()
         this.port_ready = true
 
-        this.setupMAVMessages()
-    }
-
-    setupMAVMessages() {
         this.createMsgInterval(common.BatteryStatus.MSG_ID, 500)
         this.createMsgInterval(VehicleData.MSG_ID, 100)
         this.createMsgInterval(ThrottleData.MSG_ID, 100)
@@ -154,7 +140,7 @@ export default class MavlinkController {
         this.createMsgInterval(ComputerStatus.MSG_ID, 1000)
     }
 
-    async send(msg: MavLinkData | MavLinkData[], wait_for_next: number = 10): Promise<boolean> {
+    async send(msg: MavLinkData | MavLinkData[]): Promise<boolean> {
         if (this.port_ready) {
             if (msg instanceof MavLinkData) {
                 try {
@@ -172,7 +158,6 @@ export default class MavlinkController {
                 for (const m of msg) {
                     try {
                         await this.send(m)
-                        await sleep(wait_for_next)
                     } catch (e) {
                         await this.main.logs_controller.error("Error when sending msg (" + msg.constructor.name + "): ", e)
                         return false
@@ -228,13 +213,16 @@ export default class MavlinkController {
         })
     }
 
-    async handle_packet(data: MavLinkData) {
-        if (data instanceof common.ParamRequestList) {
+    async handle_packet(data: MavLinkData, sys_id: number, comp_id: number) {
+        if (data instanceof minimal.Heartbeat) {
+
+        } else if (data instanceof common.ParamRequestList) {
             const params_keys: string[] = this.main.data_controller.getParams()
+            this.shouldSendMavMessages(false)
             for (let i = 0; i < params_keys.length; i++) {
                 await this.send(this.create_param_msg(params_keys[i], i, params_keys.length))
-                await sleep(100)
             }
+            this.shouldSendMavMessages(true)
         } else if (data instanceof common.ParamRequestRead) {
             await this.send(this.create_param_msg(data.paramId, data.paramIndex))
         } else if (data instanceof common.ParamSet) {
@@ -270,15 +258,15 @@ export default class MavlinkController {
             this.main.data_controller.params.radio_fixed = data.fixed
             await this.send(data)
         } else if (data instanceof common.FileTransferProtocol) {
-            await this.onFTPEvent(data)
+            await this.onFTPEvent(data, sys_id, comp_id)
         } else if (data instanceof common.CommandLong && data.command == common.MavCmd.LOGGING_START) {
-            await this.main.data_controller.startSendingDataLog(data._param1)
+            await this.main.data_controller.startSendingDataLog(data._param1, sys_id, comp_id)
         } else if (data instanceof common.CommandLong && data.command == common.MavCmd.LOGGING_STOP) {
             await this.main.data_controller.stopSendingDataLog()
         } else if (data instanceof common.LoggingData) {
-            await this.main.data_controller.sendLoggingDataList()
-        } else if (!(data instanceof common.LoggingAck)){
-            await this.main.logs_controller.warning('Received packet:' + data.toString())
+            await this.main.data_controller.sendLoggingDataList(sys_id, comp_id)
+        } else if (!(data instanceof common.LoggingAck)) {
+            await this.main.logs_controller.warning(`Received unknown msg: ${data.constructor.name} from: ${sys_id}|${comp_id}`)
         }
     }
 
@@ -336,13 +324,13 @@ export default class MavlinkController {
                     lv_battery_msg.type = MavBatteryType.LIFE
                     lv_battery_msg.batteryRemaining = Math.round(this.main.data_controller.params.lv_bdi * 100)
                     lv_battery_msg.chargeState = MavBatteryChargeState.UNDEFINED
-                    lv_battery_msg.currentBattery = this.main.data_controller.params.lv_cur_amp*10
+                    lv_battery_msg.currentBattery = this.main.data_controller.params.lv_cur_amp * 10
                     lv_battery_msg.timeRemaining = 0
                     lv_battery_msg.temperature = this.main.data_controller.params.lv_cur_temp * 100
-                    lv_battery_msg.currentConsumed = this.main.data_controller.params.lv_cons_cap*1000
-                    lv_battery_msg.energyConsumed = this.main.data_controller.params.lv_cons_energy*1000
+                    lv_battery_msg.currentConsumed = this.main.data_controller.params.lv_cons_cap * 1000
+                    lv_battery_msg.energyConsumed = this.main.data_controller.params.lv_cons_energy * 1000
                     lv_battery_msg.mode = MavBatteryMode.UNKNOWN
-                    lv_battery_msg.voltages[0] = this.main.data_controller.params.lv_cur_voltage*100
+                    lv_battery_msg.voltages[0] = this.main.data_controller.params.lv_cur_voltage * 100
 
                     const hv_battery_msg = new common.BatteryStatus()
                     hv_battery_msg.id = 1
@@ -350,13 +338,13 @@ export default class MavlinkController {
                     hv_battery_msg.type = MavBatteryType.LIFE
                     hv_battery_msg.batteryRemaining = Math.round(this.main.data_controller.params.hv_bdi * 100)
                     hv_battery_msg.chargeState = MavBatteryChargeState.UNDEFINED
-                    hv_battery_msg.currentBattery = this.main.data_controller.params.hv_cur_amp*10
+                    hv_battery_msg.currentBattery = this.main.data_controller.params.hv_cur_amp * 10
                     hv_battery_msg.timeRemaining = 0
                     hv_battery_msg.temperature = this.main.data_controller.params.hv_cur_temp * 100
-                    hv_battery_msg.currentConsumed = this.main.data_controller.params.hv_cons_cap*1000
-                    hv_battery_msg.energyConsumed = this.main.data_controller.params.hv_cons_energy*1000
+                    hv_battery_msg.currentConsumed = this.main.data_controller.params.hv_cons_cap * 1000
+                    hv_battery_msg.energyConsumed = this.main.data_controller.params.hv_cons_energy * 1000
                     hv_battery_msg.mode = MavBatteryMode.UNKNOWN
-                    hv_battery_msg.voltages[0] = this.main.data_controller.params.hv_cur_voltage*100
+                    hv_battery_msg.voltages[0] = this.main.data_controller.params.hv_cur_voltage * 100
 
                     return [lv_battery_msg, hv_battery_msg]
                 }
@@ -440,14 +428,15 @@ export default class MavlinkController {
     }
 
     ftpPayload(
+        sys_id: number, comp_id: number,
         opcode: common.MavFtpOpcode,
         data: Uint8Array | string | number = new Uint8Array(0),
         offset = 0
     ): common.FileTransferProtocol {
         const result: common.FileTransferProtocol = new common.FileTransferProtocol()
         result.targetNetwork = 0
-        result.targetSystem = 1
-        result.targetComponent = 1
+        result.targetSystem = sys_id
+        result.targetComponent = comp_id
 
         result.payload = [...this.ftp_serializer.serialize({
             seq: this.ftp_sequence,
@@ -462,7 +451,7 @@ export default class MavlinkController {
         return result
     }
 
-    async onFTPEvent(data: common.FileTransferProtocol) {
+    async onFTPEvent(data: common.FileTransferProtocol, sys_id: number, comp_id: number) {
         const payload = this.ftp_serializer.deserialize(Buffer.from(data.payload))
         this.ftp_sequence = payload.seq
 
@@ -480,18 +469,18 @@ export default class MavlinkController {
             }
             this.ftp_file_handler = await fsPromises.open(this.ftp_write_file_name, "w+");
             this.ftp_session = Math.round(Math.random() * 255)
-            await this.send(this.ftpPayload(MavFtpOpcode.ACK))
+            await this.send(this.ftpPayload(sys_id, comp_id, MavFtpOpcode.ACK))
         } else if (payload.opcode == MavFtpOpcode.WRITEFILE) {
             if (this.ftp_write_file_name && this.ftp_file_handler && payload.session == this.ftp_session) {
                 fs.appendFileSync(this.ftp_write_file_name, payload.data)
                 await this.ftp_file_handler.write(payload.data, 0, payload.data.length, payload.offset);
-                await this.send(this.ftpPayload(MavFtpOpcode.ACK))
+                await this.send(this.ftpPayload(sys_id, comp_id, MavFtpOpcode.ACK))
             }
         } else if (payload.opcode == MavFtpOpcode.TERMINATESESSION) {
             if (payload.session == this.ftp_session) {
                 this.ftp_session = 0
                 await this.main.logs_controller.info("Terminating FTP session.")
-                await this.send(this.ftpPayload(MavFtpOpcode.ACK))
+                await this.send(this.ftpPayload(sys_id, comp_id, MavFtpOpcode.ACK))
                 this.ftp_file_handler?.close()
                 await this.main.handleNewFirmware(this.ftp_write_file_name)
                 this.ftp_write_file_name = ""

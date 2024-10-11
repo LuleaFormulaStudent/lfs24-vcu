@@ -1,5 +1,5 @@
 import {I2CBus, openSync} from "i2c-bus"
-import {sleep} from "../../src/helper_functions.js";
+import {sleep} from "../helper_functions.js";
 import os from "os";
 import EventEmitter from "node:events";
 

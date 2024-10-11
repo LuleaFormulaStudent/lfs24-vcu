@@ -3,18 +3,35 @@ services:
         container_name: influxdb
         image: influxdb
         restart: no
-        env_file: ./.env
+        env_file: ./main/.env
         ports:
             - "8086:8086"
         volumes:
             - ./data/influxdb-data:/var/lib/influxdb2
             - ./data/influxdb-config:/etc/influxdb2
 
-    lfs_vcu:
-        container_name: lfs-vcu
-        build: .
+    lfs_vcu_main:
+        container_name: lfs-vcu-main
+        build: main
         command: "npm run prod"
-        env_file: ./.env
+        env_file: ./main/.env
+        privileged: true
+        restart: no
+        depends_on:
+            mavlink_router:
+                condition: service_started
+        ports:
+            - "6000:6000"
+        volumes:
+            - ./data:/lfs-vcu/data
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
+
+    mavlink_router:
+        container_name: mavlink-router
+        build: mavlink-router
+        command: "npm run prod"
+        env_file: ./mavlink-router/.env
         privileged: true
         restart: no
         depends_on:
@@ -22,8 +39,7 @@ services:
                 condition: service_started
         ports:
             - "5432:5432"
-            - "6000:6000"
         volumes:
-            - ./data:/lfs-vcu/data
-            - ./:/lfs-vcu/source
-            - /var/run/docker.sock:/var/run/docker.sock
+            - ./data:/mavlink-router/data
+        devices:
+            -   "class/86E0D1E0-8089-11D0-9CE4-08003E301F73"

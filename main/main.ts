@@ -1,17 +1,15 @@
-import StatusLed from "./src/controllers/status_led.js";
-import TractionSystemController from "./src/controllers/traction_system_controller.js";
-import SteeringWheelController from "./src/controllers/steering_wheel_controller.js";
-import DataController from "./src/controllers/data_controller.js";
-import DigitalOutputsController from "./src/controllers/digital_outputs_controller.js";
-import MavlinkController from "./src/controllers/mavlink_controller.js";
+import StatusLed from "./controllers/status_led.js";
+import TractionSystemController from "./controllers/traction_system_controller.js";
+import SteeringWheelController from "./controllers/steering_wheel_controller.js";
+import DataController from "./controllers/data_controller.js";
+import DigitalOutputsController from "./controllers/digital_outputs_controller.js";
+import MavlinkController from "./controllers/mavlink_controller.js";
 import {MavModeFlag, MavState} from "mavlink-mappings/dist/lib/minimal.js";
-import {createServer, Server, Socket} from "node:net";
-import LogsController from "./src/controllers/logs_controller.js";
+import LogsController from "./controllers/logs_controller.js";
 import package_info from "./package.json"
 import {configDotenv} from "dotenv";
-import HILController from "./src/controllers/hil_controller.js";
+import HILController from "./controllers/hil_controller.js";
 import {DrivingMode} from "mavlink-lib/dist/lfs.js";
-import {waitFor} from "node-mavlink";
 import {exec} from "node:child_process";
 import AdmZip from "adm-zip";
 import fs from "fs";
@@ -30,10 +28,6 @@ export default class Main {
     logs_controller: LogsController
     hil_controller: HILController
 
-    tcp_server: Server
-    tcp_server_connections: Socket[] = []
-    tcp_server_stared = false
-
     in_production: boolean = process.env.NODE_ENV == 'production'
     start_time: number = Date.now()
     version: string = package_info.version
@@ -47,7 +41,6 @@ export default class Main {
         this.steering_wheel_controller = new SteeringWheelController(this)
         this.mavlink_controller = new MavlinkController(this)
         this.hil_controller = new HILController(this)
-        this.tcp_server = createServer()
     }
 
     async init() {
@@ -86,11 +79,6 @@ export default class Main {
             await this.logs_controller.info("System is in development mode.")
             this.setSystemMode(MavModeFlag.HIL_ENABLED, true)
         }
-
-        await this.logs_controller.info("Initializing TCP server..")
-        this.tcp_server.on('error', (err) => {
-            this.logs_controller.error("TCP Server error:", err)
-        });
 
         await this.data_controller.init()
         await this.digital_outputs_controller.init()

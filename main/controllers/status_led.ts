@@ -1,5 +1,5 @@
 import {Gpio} from "onoff"
-import Main from "../../main";
+import Main from "../main.js";
 
 export default class StatusLed {
 

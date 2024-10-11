@@ -1,4 +1,4 @@
-import Main from "../../main.js";
+import Main from "../main.js";
 import {SerialPort} from "serialport";
 import {ReadlineParser} from "@serialport/parser-readline"
 import {MavState} from "mavlink-mappings/dist/lib/minimal.js";

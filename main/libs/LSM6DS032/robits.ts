@@ -1,7 +1,6 @@
 import {I2CBus} from "i2c-bus";
-import {range} from "../../src/helper_functions.js";
 
-export default class RWBits {
+export default class ROBits {
 
     buffer: Buffer
     bit_mask: number
@@ -39,29 +38,6 @@ export default class RWBits {
             reg -= 2 * this.sign_bit
         }
         return reg
-    }
-
-    set val(value: number) {
-        value <<= this.lowest_bit
-        const read_buffer = Buffer.alloc(this.buffer.length - 1)
-        this.i2c.readI2cBlockSync(this.i2c_adress, this.register_address, read_buffer.length, read_buffer)
-        this.buffer.set(read_buffer, 1)
-        let reg = 0
-        let order = range(this.buffer.length, 0, -1)
-        if (!this.lsb_first) {
-            order = range(0, this.buffer.length, 1)
-        }
-        for (const i of order) {
-            reg = (reg << 8) | this.buffer[i]
-        }
-        reg &= ~this.bit_mask
-        reg |= value
-        order.reverse()
-        for (const i of order) {
-            this.buffer[i] = reg & 0xFF
-            reg >>= 8
-        }
-        this.i2c.i2cWriteSync(this.i2c_adress, this.buffer.length, this.buffer)
     }
 
 }

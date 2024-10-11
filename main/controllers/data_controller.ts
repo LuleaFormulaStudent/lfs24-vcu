@@ -1,18 +1,18 @@
-import ADS1115 from "../../libs/ads1115_lib/ADS1115.js";
-import VCUCoMcu from "../../libs/vcu_co_mcu/vcu_co_mcu.js";
-import Main from "../../main.js";
+import ADS1115 from "../libs/ads1115_lib/ADS1115.js";
+import VCUCoMcu from "../libs/vcu_co_mcu/vcu_co_mcu.js";
+import Main from "../main.js";
 import {MavModeFlag, MavState} from "mavlink-mappings/dist/lib/minimal.js";
 import {common} from "node-mavlink";
-import ParamsHandler from "../params_handler.js";
+import ParamsHandler from "../libs/params_handler.js";
 import {InfluxDB, Point, QueryApi, WriteApi} from "@influxdata/influxdb-client";
-import {map_range, sleep} from "../helper_functions.js";
+import {map_range} from "../libs/helper_functions.js";
 import {DrivingMode} from "mavlink-lib/dist/lfs.js";
 import {GpsFixType} from "mavlink-mappings/dist/lib/common.js";
-import LSM6DS032 from "../../libs/LSM6DS032/LSM6DS032.js";
-import SystemInfo, {SystemInfoData} from "../../libs/system_info/system_info.js";
-import GPSDriver, {GGAQuality} from "../../libs/gps/gps_driver.js";
-import INA260 from "../../libs/ina260/ina260.js";
-import CanDriver from "../../libs/can_driver.js";
+import LSM6DS032 from "../libs/LSM6DS032/LSM6DS032.js";
+import SystemInfo, {SystemInfoData} from "../libs/system_info/system_info.js";
+import GPSDriver, {GGAQuality} from "../libs/gps/gps_driver.js";
+import INA260 from "../libs/ina260/ina260.js";
+import CanDriver from "../libs/can_driver.js";
 import {exec} from "node:child_process";
 import {encode} from "@msgpack/msgpack";
 import {deflateRawSync} from "node:zlib";
@@ -115,16 +115,16 @@ export default class DataController extends ParamsHandler {
             lv_max_amp: 15,
             lv_cur_amp: 0,
             lv_cur_temp: 0,
-            lv_cur_power: 20,
+            lv_cur_power: 0,
             hv_bdi: 1,
             hv_max_energy: 5018, //3.45 * 55 * 32,
             hv_cons_cap: 0,
             hv_cons_energy: 0,
             hv_max_voltage: 3.45 * 32,
-            hv_cur_voltage: 107,
+            hv_cur_voltage: 0,
             hv_max_amp: 650,
             hv_cur_amp: 0,
-            hv_cur_temp: 20,
+            hv_cur_temp: 0,
             acc_lon: 0,
             acc_lat: 0,
             acc_z: 0,
@@ -408,7 +408,7 @@ export default class DataController extends ParamsHandler {
                     this.params.gps_altitude = data.alt
                 }
                 if (data.hasOwnProperty("speed")) {
-                    this.params.gps_speed = data.speed
+                    this.params.gps_speed = data.speed / 3.6
                 }
                 if (data.hasOwnProperty("satsActive")) {
                     this.params.gps_num_sats = data.satsActive
@@ -531,6 +531,7 @@ export default class DataController extends ParamsHandler {
             this.params.fl_wheel_speed * 3.6,
             this.params.fr_wheel_speed * 3.6,
             this.params.rear_axle_speed * 3.6,
+            this.params.gps_speed * 3.6
             //this.params.imu_lon_speed*3.6 // TODO re-add this after calibrating
         ]
 
@@ -542,15 +543,10 @@ export default class DataController extends ParamsHandler {
             }
         }
 
-        if (this.params.gps_speed > 1) {
-            vehicle_speed += this.params.gps_speed//*3.6
-            speeds_used++
-        }
-
         this.params.vehicle_speed = Math.round(vehicle_speed / (speeds_used == 0 ? 1 : speeds_used))
     }
 
-    async startSendingDataLog(log_id: number) {
+    async startSendingDataLog(log_id: number, sys_id: number, comp_id: number) {
         this.stop_sending_logging_data = false
         const measurements = await this.getMeasurements()
         const drive = measurements[log_id]
@@ -591,8 +587,8 @@ export default class DataController extends ParamsHandler {
 
         const init_msg = new common.LoggingDataAcked()
         init_msg.data = Array.from(encode({packets: chunks}))
-        init_msg.targetSystem = 253
-        init_msg.targetComponent = 1
+        init_msg.targetSystem = sys_id
+        init_msg.targetComponent = comp_id
         init_msg.length = init_msg.data.length
         init_msg.firstMessageOffset = 0
         init_msg.sequence = 0
@@ -613,7 +609,7 @@ export default class DataController extends ParamsHandler {
                     data_chunk = new Uint8Array(data_buffer.subarray(i * chunk_size, (i + 1) * chunk_size))
                 }
                 msg.data = i < chunks ? Array.from(data_chunk) : []
-                msg.targetSystem = 253
+                msg.targetSystem = 254
                 msg.targetComponent = 1
                 msg.length = i < chunks ? data_chunk.length : 0
                 msg.firstMessageOffset = i % 255
@@ -632,10 +628,6 @@ export default class DataController extends ParamsHandler {
                     break;
                 } else {
                     tri++
-                }
-
-                if (this.main.in_production) {
-                    await sleep(5)
                 }
             }
             if (succeeded) {
@@ -661,7 +653,7 @@ export default class DataController extends ParamsHandler {
         return measurements
     }
 
-    async sendLoggingDataList() {
+    async sendLoggingDataList(sys_id: number, comp_id: number) {
         await this.main.logs_controller.info("Got request for transferring data log list.")
 
         return await this.main.mavlink_controller.send(await this.getMeasurements().then((measurements) => measurements
@@ -674,8 +666,8 @@ export default class DataController extends ParamsHandler {
                 msg.sequence = index
                 msg.length = msg.data.length
                 msg.firstMessageOffset = index
-                msg.targetSystem = 1
-                msg.targetComponent = 1
+                msg.targetSystem = sys_id
+                msg.targetComponent = comp_id
                 return msg
             })))
     }

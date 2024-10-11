@@ -1,6 +1,5 @@
-import Main from "../../main.js";
+import Main from "../main.js";
 import {common} from "node-mavlink";
-import {sleep} from "../helper_functions.js";
 import fs from "fs";
 import path from "path";
 import {MavSeverity} from "mavlink-mappings/dist/lib/common.js";
@@ -61,7 +60,7 @@ export default class LogsController {
             await this.sendLogMsg(this.log_id, severity, text)
         }
 
-        const log_text = `[${this.formatCurrentDate(date)} ${this.getTime(date)}] [${severity_text}] ` + text
+        const log_text = `[${this.formatCurrentDate(date)} ${this.getTime(date)}] [MAIN] [${severity_text}] ` + text
         this.writeToFile(`main/full_` + this.formatCurrentDate(date) + ".log", log_text)
         this.writeToFile(`main/${severity_text.toLowerCase()}_` + this.formatCurrentDate(date) + ".log", log_text)
         if (err) {
@@ -100,9 +99,6 @@ export default class LogsController {
             if (!await this.main.mavlink_controller.send(msg)) {
                 console.log("Failed to send log")
             }
-            if (chunk_id != chunks - 1) {
-                await sleep(50)
-            }
         }
     }
 
@@ -114,11 +110,9 @@ export default class LogsController {
             msg.numLogs = this.logs.length
             msg.lastLogNum = this.log_id
             await this.main.mavlink_controller.send(msg)
-            await sleep(100)
 
             for (let i: number = start_id; i < Math.min(end_id + 1, this.logs.length); i++) {
                 await this.sendLogMsg(this.logs[i].id, this.logs[i].severity, this.logs[i].text)
-                await sleep(100)
             }
             this.ready_to_send = true
         } catch (err) {
