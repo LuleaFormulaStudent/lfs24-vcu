@@ -46,7 +46,7 @@ export default class Mavlink_router {
         ...REGISTRY
     }
 
-    serial_port_paths = ["/dev/tel_radio"] ///dev/ttyAMA2
+    serial_port_paths = ["/dev/ttyAMA2"] ///dev/ttyAMA2
 
     constructor() {
         this.tcp_server = createServer()
