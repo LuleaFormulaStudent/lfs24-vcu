@@ -54,7 +54,7 @@ export default class MavlinkController {
 
     port_ready = false
 
-    private send_mav_messages = true
+    private send_mav_messages = false
     mav_messages_interval_times: { [propName: number]: number } = {}
     mav_messages_intervals: { [propName: number]: any } = {}
 

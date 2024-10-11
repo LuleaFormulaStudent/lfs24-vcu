@@ -73,9 +73,10 @@ export default class Mavlink_router {
         });
 
         if (this.in_production) {
-            for (const path in this.serial_port_paths) {
+            for (const path of this.serial_port_paths) {
+		this.logs_controller.info("Registered new port: " + path)
                 const port = new SerialPort({path, baudRate: 57600}); ///dev/ttyAMA2
-                this.logs_controller.info("Registered new port:" + path)
+                //this.logs_controller.info("Registered new port:" + path)
                 this.setupConnection(port, true)
             }
         }
@@ -130,7 +131,7 @@ export default class Mavlink_router {
 
                                         this.send(connection, msg, packet)
                                     }
-                                }, 10) : null
+                                }, 15) : null
                             })
 
                             this.logs_controller.debug("Added new connection: " + `SYS ID: ${from_system} | COMP ID: ${from_component}`)
@@ -166,7 +167,7 @@ export default class Mavlink_router {
                             }
                         }
 
-                        //await this.logs_controller.debug(`Got ${packet_data.constructor.name} from: ${packet.header.sysid}|${packet.header.compid} to ${target_system}|${target_component}`)
+                        await this.logs_controller.debug(`Got ${packet_data.constructor.name} from: ${packet.header.sysid}|${packet.header.compid} to ${target_system}|${target_component}`)
                     }
                 } catch (e) {
                     this.logs_controller.error("Error with packet parsing when routing:", e)

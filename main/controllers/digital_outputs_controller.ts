@@ -82,8 +82,8 @@ export default class DigitalOutputsController {
         msg.reverseSwitch = this.main.data_controller.params.reverse_output
         msg.brakeLight = this.main.data_controller.params.brake_light_out
         msg.coolantPumpOut = this.main.data_controller.params.cool_pump_output
-        this.main.mavlink_controller.send(msg).catch(async () => {
+        /*this.main.mavlink_controller.send(msg).catch(async () => {
             await this.main.logs_controller.error("Sending digital outputs message failed!")
-        })
+        })*/
     }
 }
