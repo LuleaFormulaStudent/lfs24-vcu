@@ -10,7 +10,8 @@ export default class CanDriver extends EventEmitter {
         this.channel = createRawChannel(channel)
         this.channel.addListener("onMessage", (msg: Message) => {
             const data = [msg.data.readInt16LE(6), msg.data.readInt16LE(4), msg.data.readInt16LE(2), msg.data.readInt16LE(0)]
-            this.emit("data", data);
+	//console.log(msg, data)            
+this.emit("data", data);
         });
         this.channel.start()
     }

@@ -211,7 +211,7 @@ export default class DataController extends ParamsHandler {
                 max: 150
             },
             vehicle_power: {
-                min: 0,
+                min: -70000,
                 max: 70000
             },
             gps_speed: {
@@ -263,7 +263,7 @@ export default class DataController extends ParamsHandler {
                 min: 0
             },
             hv_cur_amp: {
-                min: 0,
+                min: -700,
                 max: 700
             },
             hv_max_amp: {
@@ -493,8 +493,8 @@ export default class DataController extends ParamsHandler {
         if (this.can_driver) {
             this.can_driver = new CanDriver()
             this.can_driver.on("data", (raw_data: number[]) => {
-                this.params.hv_cur_temp = Math.max(raw_data[1], raw_data[2]) / 100
-                //this.params.hv_cur_amp = raw_data[0] / 10 // TODO re-add this after checking why this is not working
+                this.params.hv_cur_temp = Math.max(raw_data[1], raw_data[2], raw_data[3]) / 100
+		this.params.hv_cur_amp = raw_data[0] / 10 // TODO re-add this after checking why this is not working
             })
         }
 
@@ -518,7 +518,7 @@ export default class DataController extends ParamsHandler {
 
         this.addParamListener("throttle_output", ({value}) => {
             if (!this.main.isInSystemMode(MavModeFlag.HIL_ENABLED)) {
-                this.params.hv_cur_amp = this.params.hv_max_amp * value
+                //this.params.hv_cur_amp = this.params.hv_max_amp * value
             }
         })
 

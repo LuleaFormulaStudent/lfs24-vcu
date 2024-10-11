@@ -84,6 +84,7 @@ export default class DigitalOutputsController {
     }
 
     sendDOMessage() {
+	console.log("HEJ")
         const msg = new DigitalOutputsMessage()
         msg.redLedOutput = this.main.data_controller.params.red_led_output
         msg.greenLedOutput = this.main.data_controller.params.green_led_output

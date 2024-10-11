@@ -130,7 +130,7 @@ export default class Mavlink_router {
 
                                         this.send(connection, msg, packet)
                                     }
-                                }, 15) : null
+                                }, 20) : null
                             })
 
                             this.logs_controller.debug("Added new connection: " + `SYS ID: ${from_system} | COMP ID: ${from_component}`)
