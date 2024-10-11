@@ -39,6 +39,7 @@ export default class Mavlink_router {
     }[] = []
 
     slow_connections_backlog: { [propName: string]: { msg: MavLinkData, packet: MavLinkPacket }[] } = {}
+    slow_connection_interval = parseInt(process.env.MLR_SLOW_CONNECTION_INTERVAL)
 
     REGISTRY: MavLinkPacketRegistry = {
         ...minimal.REGISTRY,
@@ -131,7 +132,7 @@ export default class Mavlink_router {
 
                                         this.send(connection, msg, packet)
                                     }
-                                }, 20) : null
+                                }, this.slow_connection_interval) : null
                             })
 
                             this.logs_controller.debug("Added new connection: " + `SYS ID: ${from_system} | COMP ID: ${from_component}`)
