@@ -20,55 +20,67 @@ export default class DigitalOutputsController {
     }
 
     setFootSwitch(val: boolean) {
-        this.main.data_controller.params.fs_output = val
-        if (this.board) {
-            this.board.setOutput(5, val)
+        if (val != this.main.data_controller.params.fs_output) {
+            this.main.data_controller.params.fs_output = val
+            if (this.board) {
+                this.board.setOutput(5, val)
+            }
+            this.sendDOMessage()
         }
-        this.sendDOMessage()
     }
 
     setForwardSwitch(val: boolean, should_send: boolean = true) {
-        this.main.data_controller.params.forward_output = val
-        if (this.board) {
-            this.board.setOutput(6, val)
-        }
-        if (should_send) {
-            this.sendDOMessage()
+        if (val != this.main.data_controller.params.forward_output) {
+            this.main.data_controller.params.forward_output = val
+            if (this.board) {
+                this.board.setOutput(6, val)
+            }
+            if (should_send) {
+                this.sendDOMessage()
+            }
         }
     }
 
     setReverseSwitch(val: boolean, should_send: boolean = true) {
-        this.main.data_controller.params.reverse_output = val
-        if (this.board) {
-            this.board.setOutput(4, val)
-        }
-        if (should_send) {
-            this.sendDOMessage()
+        if (val != this.main.data_controller.params.reverse_output) {
+            this.main.data_controller.params.reverse_output = val
+            if (this.board) {
+                this.board.setOutput(4, val)
+            }
+            if (should_send) {
+                this.sendDOMessage()
+            }
         }
     }
 
     setCoolantPumpOutput(val: boolean) {
-        this.main.data_controller.params.cool_pump_output = val
-        if (this.board) {
-            this.board.setOutput(8, val)
+        if (val != this.main.data_controller.params.cool_pump_output) {
+            this.main.data_controller.params.cool_pump_output = val
+            if (this.board) {
+                this.board.setOutput(8, val)
+            }
+            this.sendDOMessage()
         }
-        this.sendDOMessage()
     }
 
     setBrakeLightOutput(val: boolean) {
-        this.main.data_controller.params.brake_light_out = val
-        if (this.board) {
-            this.board.setOutput(7, val)
+        if (val != this.main.data_controller.params.brake_light_out) {
+            this.main.data_controller.params.brake_light_out = val
+            if (this.board) {
+                this.board.setOutput(7, val)
+            }
+            this.sendDOMessage()
         }
-        this.sendDOMessage()
     }
 
     setTSActiveRelay(val: boolean) {
-        this.main.data_controller.params.ts_active_out = val
-        if (this.board) {
-            this.board.setOutput(2, val)
+        if (val != this.main.data_controller.params.ts_active_out) {
+            this.main.data_controller.params.ts_active_out = val
+            if (this.board) {
+                this.board.setOutput(2, val)
+            }
+            this.sendDOMessage()
         }
-        this.sendDOMessage()
     }
 
     sendDOMessage() {
@@ -82,8 +94,8 @@ export default class DigitalOutputsController {
         msg.reverseSwitch = this.main.data_controller.params.reverse_output
         msg.brakeLight = this.main.data_controller.params.brake_light_out
         msg.coolantPumpOut = this.main.data_controller.params.cool_pump_output
-        /*this.main.mavlink_controller.send(msg).catch(async () => {
+        this.main.mavlink_controller.send(msg).catch(async () => {
             await this.main.logs_controller.error("Sending digital outputs message failed!")
-        })*/
+        })
     }
 }

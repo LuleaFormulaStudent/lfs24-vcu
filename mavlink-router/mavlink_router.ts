@@ -74,9 +74,8 @@ export default class Mavlink_router {
 
         if (this.in_production) {
             for (const path of this.serial_port_paths) {
-		this.logs_controller.info("Registered new port: " + path)
-                const port = new SerialPort({path, baudRate: 57600}); ///dev/ttyAMA2
-                //this.logs_controller.info("Registered new port:" + path)
+		        this.logs_controller.info("Registered new port: " + path)
+                const port = new SerialPort({path, baudRate: 57600});
                 this.setupConnection(port, true)
             }
         }
