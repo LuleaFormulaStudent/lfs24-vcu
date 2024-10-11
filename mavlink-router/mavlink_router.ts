@@ -59,10 +59,11 @@ export default class Mavlink_router {
     }
 
     async init() {
-        await this.logs_controller.info("Initiating mavlink router..")
+        this.logs_controller.info("Initiating mavlink router..")
+        this.logs_controller.info("Version: " + this.version)
 
         this.tcp_server.on('connection', (socket) => {
-            this.setupConnection(socket, true)
+            this.setupConnection(socket, false)
             this.logs_controller.info("New tcp connection.")
         });
 
@@ -74,6 +75,7 @@ export default class Mavlink_router {
         if (this.in_production) {
             for (const path in this.serial_port_paths) {
                 const port = new SerialPort({path, baudRate: 57600}); ///dev/ttyAMA2
+                this.logs_controller.info("Registered new port:" + path)
                 this.setupConnection(port, true)
             }
         }
@@ -131,7 +133,7 @@ export default class Mavlink_router {
                                 }, 10)
                             })
 
-                            await this.logs_controller.debug("Added new connection: " + `SYS ID: ${from_system} | COMP ID: ${from_component}`)
+                            this.logs_controller.debug("Added new connection: " + `SYS ID: ${from_system} | COMP ID: ${from_component}`)
                         }
 
                         if (target_system > 0) {
@@ -167,7 +169,7 @@ export default class Mavlink_router {
                         //await this.logs_controller.debug(`Got ${packet_data.constructor.name} from: ${packet.header.sysid}|${packet.header.compid} to ${target_system}|${target_component}`)
                     }
                 } catch (e) {
-                    await this.logs_controller.error("Error with packet parsing when routing:", e)
+                    this.logs_controller.error("Error with packet parsing when routing:", e)
                 }
             })
 
@@ -175,19 +177,19 @@ export default class Mavlink_router {
             const conn_index = this.connections.findIndex(({conn}) => connection == conn)
 
             if (conn_index >= 0) {
-                this.logs_controller.debug("Removed connection: " + `SYS ID: ${this.connections[conn_index].sys_id} | COMP ID: ${this.connections[conn_index].comp_id}`).catch(console.error)
+                this.logs_controller.debug("Removed connection: " + `SYS ID: ${this.connections[conn_index].sys_id} | COMP ID: ${this.connections[conn_index].comp_id}`)
                 if (slow_connection) {
                     this.slow_connections_backlog[this.toConnID(this.connections[conn_index].sys_id, this.connections[conn_index].comp_id)] = []
                     clearInterval(this.connections[conn_index].backlog_interval)
                 }
                 this.connections.splice(this.connections.findIndex(({conn}) => connection == conn), 1)
             } else {
-                this.logs_controller.error("Tried to remove a connection that did not exist.").catch(console.error)
+                this.logs_controller.error("Tried to remove a connection that did not exist.")
             }
         });
 
         connection.on("error", (err) => {
-            this.logs_controller.error("Error on routing message", err).catch(console.error)
+            this.logs_controller.error("Error on routing message", err)
         })
     }
 
@@ -196,18 +198,9 @@ export default class Mavlink_router {
             await send(<Writable>conn, msg, packet.protocol)
             return true
         } catch (e) {
-            await this.logs_controller.error("Error when routing msg (" + msg.constructor.name + "): ", e)
+            this.logs_controller.error("Error when routing msg (" + msg.constructor.name + "): ", e)
             return false
         }
-    }
-
-    async sendTo(msg: MavLinkData, sys_id: number, comp_id = MavComponent.ALL): Promise<boolean> {
-        for (let i = 0; i < this.connections.length; i++) {
-            if (this.connections[i].sys_id == sys_id && (comp_id == 0 || this.connections[i].comp_id == comp_id)) {
-                await send(<Writable>this.connections[i].conn, msg)
-            }
-        }
-        return true
     }
 }
 

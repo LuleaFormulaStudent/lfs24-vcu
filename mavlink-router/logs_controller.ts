@@ -42,7 +42,7 @@ export default class LogsController {
         }
     }
 
-    async log(text: string, severity: MavSeverity, log_fn = console.log, err: any = null,) {
+    log(text: string, severity: MavSeverity, log_fn = console.log, err: any = null,) {
         const date = new Date(Date.now())
         const severity_text = MavSeverity[severity].toString()
         if (err) {
@@ -52,10 +52,6 @@ export default class LogsController {
         this.log_id++
         this.logs.push({id: this.log_id, severity: severity, text})
 
-        if (this.ready_to_send) {
-            await this.sendLogMsg(this.log_id, severity, text)
-        }
-
         const log_text = `[${this.formatCurrentDate(date)} ${this.getTime(date)}] [MAVLINK ROUTER] [${severity_text}] ` + text
         this.writeToFile(`full_` + this.formatCurrentDate(date) + ".log", log_text)
         this.writeToFile(`${severity_text.toLowerCase()}_` + this.formatCurrentDate(date) + ".log", log_text)
@@ -64,40 +60,19 @@ export default class LogsController {
         }
     }
 
-    async info(text: string) {
-        await this.log(text, MavSeverity.INFO)
+    info(text: string) {
+        this.log(text, MavSeverity.INFO)
     }
 
-    async debug(text: string) {
-        await this.log(text, MavSeverity.DEBUG)
+    debug(text: string) {
+        this.log(text, MavSeverity.DEBUG)
     }
 
-    async warning(text: string) {
-        await this.log(text, MavSeverity.WARNING, console.warn)
+    warning(text: string) {
+        this.log(text, MavSeverity.WARNING, console.warn)
     }
 
-    async error(text: string, err: any = null) {
-        await this.log(text, MavSeverity.ERROR, console.error, err)
-    }
-
-    private async sendLogMsg(id: number, severity: common.MavSeverity, text: string) {
-        const chunks = Math.ceil(text.length / this.chunk_size)
-
-        for (let chunk_id = 0; chunk_id < chunks; chunk_id++) {
-            const msg = new common.StatusText()
-            msg.severity = severity
-            msg.id = id
-            msg.text = text.substring(chunk_id * this.chunk_size, (chunk_id + 1) * this.chunk_size)
-            msg.chunkSeq = chunk_id
-            if (chunk_id >= chunks - 1) {
-                msg.text += "<@>"
-            }
-            /*if (!await this.main.sendTo(msg, 254)) {
-                console.error("Failed to send log")
-            }*/
-            if (chunk_id != chunks - 1 && this.main.in_production) {
-                await sleep(50)
-            }
-        }
+    error(text: string, err: any = null) {
+        this.log(text, MavSeverity.ERROR, console.error, err)
     }
 }
