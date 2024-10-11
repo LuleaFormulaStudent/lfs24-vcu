@@ -123,6 +123,7 @@ export default class Mavlink_router {
                                 backlog_interval: slow_connection? setInterval(() => {
                                     if (!(connection.destroyed || connection.writableFinished)
                                         && this.slow_connections_backlog[this.toConnID(from_system, from_component)].length) {
+                                        console.log(this.slow_connections_backlog[this.toConnID(from_system, from_component)].length)
                                         const {
                                             msg,
                                             packet
@@ -166,7 +167,7 @@ export default class Mavlink_router {
                             }
                         }
 
-                        await this.logs_controller.debug(`Got ${packet_data.constructor.name} from: ${packet.header.sysid}|${packet.header.compid} to ${target_system}|${target_component}`)
+                        //await this.logs_controller.debug(`Got ${packet_data.constructor.name} from: ${packet.header.sysid}|${packet.header.compid} to ${target_system}|${target_component}`)
                     }
                 } catch (e) {
                     this.logs_controller.error("Error with packet parsing when routing:", e)

@@ -33,6 +33,7 @@ export default class DS3502 extends EventEmitter {
                 return -1
             }
         } catch (e) {
+            this.emit("error", new Error("DS3502 error, reading wiper timeout"))
             return -1
         }
     }
@@ -46,6 +47,7 @@ export default class DS3502 extends EventEmitter {
             }
             return false
         } catch (e) {
+            this.emit("error", new Error("DS3502 error, setting wiper timeout"))
             return false
         }
     }
@@ -69,6 +71,7 @@ export default class DS3502 extends EventEmitter {
                     return false
                 }
             } catch (e) {
+                this.emit("error", new Error("DS3502 error, setting default wiper timeout"))
                 return false
             }
         }
