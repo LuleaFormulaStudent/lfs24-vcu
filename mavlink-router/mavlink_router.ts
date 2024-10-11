@@ -120,7 +120,7 @@ export default class Mavlink_router {
                                 comp_id: from_component,
                                 conn: connection,
                                 is_slow: slow_connection,
-                                backlog_interval: setInterval(() => {
+                                backlog_interval: slow_connection? setInterval(() => {
                                     if (!(connection.destroyed || connection.writableFinished)
                                         && this.slow_connections_backlog[this.toConnID(from_system, from_component)].length) {
                                         const {
@@ -130,7 +130,7 @@ export default class Mavlink_router {
 
                                         this.send(connection, msg, packet)
                                     }
-                                }, 10)
+                                }, 10) : null
                             })
 
                             this.logs_controller.debug("Added new connection: " + `SYS ID: ${from_system} | COMP ID: ${from_component}`)
