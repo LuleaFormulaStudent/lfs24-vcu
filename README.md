@@ -13,6 +13,6 @@ iface can0 inet manual
 - [ ] Lägga in styrsensorn
 - [ ] Implementera mavlink med de andra systemen
 - [ ] Addera hastighets beräkning för IMU
-- [ ] Lägga till estimering av effektförbrukning från både LV och HV
+- [x] Lägga till estimering av effektförbrukning från både LV och HV
 - [ ] Lägga till estimering av HV spänning tills det mäts
 

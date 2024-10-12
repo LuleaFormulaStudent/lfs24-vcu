@@ -14,9 +14,5 @@ export default class CanDriver extends EventEmitter {
             this.emit("data", data);
         });
         this.channel.start()
-
-        sleep(5000).then(() => {
-            this.emit("error", new Error("TEST Error!"))
-        })
     }
 }

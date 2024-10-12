@@ -1,5 +1,4 @@
 import {I2CBus, openSync} from "i2c-bus"
-import {sleep} from "../../src/helper_functions.js";
 import os from "os";
 import EventEmitter from "node:events";
 import UnaryStruct from "./unary_struct.js";
@@ -221,7 +220,7 @@ export default class LSM6DS032 extends EventEmitter {
                 return [0, 0, 0]
             }
         } catch(e) {
-            this.emit("error", new Error("Error reading acceleration data, timeout."))
+            this.emit("error", new Error("Reading acceleration data, timeout."))
             return [0, 0, 0]
         }
     }
@@ -238,7 +237,7 @@ export default class LSM6DS032 extends EventEmitter {
                 return [0, 0, 0]
             }
         } catch (e) {
-            this.emit("error", new Error("Error reading gyro data, timeout."))
+            this.emit("error", new Error("Reading gyro data, timeout."))
             return [0, 0, 0]
         }
     }
@@ -322,7 +321,7 @@ export default class LSM6DS032 extends EventEmitter {
                 return 0
             }
         } catch (e) {
-            this.emit("error", new Error("Error reading temperature data, timeout."))
+            this.emit("error", new Error("Reading temperature data, timeout."))
             return 0
         }
     }

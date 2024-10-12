@@ -9,8 +9,7 @@ import {
     MavLinkPacketSplitter,
     minimal,
     registerCustomMessageMagicNumber,
-    send,
-    waitFor
+    send
 } from "node-mavlink";
 import package_info from "./package.json"
 import LogsController from "./logs_controller";
@@ -40,14 +39,13 @@ export default class Mavlink_router {
 
     slow_connections_backlog: { [propName: string]: { msg: MavLinkData, packet: MavLinkPacket }[] } = {}
     slow_connection_interval = parseInt(process.env.MLR_SLOW_CONNECTION_INTERVAL || "15")
+    serial_devices = (process.env.MLR_SERIAL_DEVICES || "").split(",").map(device => device.trim())
 
     REGISTRY: MavLinkPacketRegistry = {
         ...minimal.REGISTRY,
         ...common.REGISTRY,
         ...REGISTRY
     }
-
-    serial_port_paths = ["/dev/ttyAMA2"] ///dev/ttyAMA2
 
     constructor() {
         this.tcp_server = createServer()
@@ -73,15 +71,13 @@ export default class Mavlink_router {
             this.tcp_server_stared = true
         });
 
-        if (this.in_production) {
-            for (const path of this.serial_port_paths) {
-		        this.logs_controller.info("Registered new port: " + path)
+        for (const path of this.serial_devices) {
+            if (path) {
+                this.logs_controller.info("Registered new port: " + path)
                 const port = new SerialPort({path, baudRate: 57600});
                 this.setupConnection(port, true)
             }
         }
-
-        await waitFor(() => this.tcp_server_stared, 1000)
     }
 
     toConnID(sys_id: number, comp_id: number): string {
@@ -121,7 +117,7 @@ export default class Mavlink_router {
                                 comp_id: from_component,
                                 conn: connection,
                                 is_slow: slow_connection,
-                                backlog_interval: slow_connection? setInterval(() => {
+                                backlog_interval: slow_connection ? setInterval(() => {
                                     if (!(connection.destroyed || connection.writableFinished)
                                         && this.slow_connections_backlog[this.toConnID(from_system, from_component)].length) {
                                         console.log(this.slow_connections_backlog[this.toConnID(from_system, from_component)].length)

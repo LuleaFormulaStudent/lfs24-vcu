@@ -39,8 +39,15 @@ export default class DataController extends ParamsHandler {
     last_imu_update: number = 0
     previous_imu_lon_speed: number = 0
 
-    last_ina_update: number = 0
+    last_ina_current_update: number = 0
     previous_ina_current: number = 0
+    last_ina_power_update: number = 0
+    previous_ina_power: number = 0
+
+    last_hv_current_update: number = 0
+    previous_hv_current: number = 0
+    last_hv_power_update: number = 0
+    previous_hv_power: number = 0
 
     history_points_cache: Point[] = []
 
@@ -413,9 +420,6 @@ export default class DataController extends ParamsHandler {
                 if (data.hasOwnProperty("satsActive")) {
                     this.params.gps_num_sats = data.satsActive
                 }
-                if (data.hasOwnProperty("satellites")) {
-                    this.params.gps_num_sats = data.satellites
-                }
                 if (data.hasOwnProperty("hdop")) {
                     this.params.gps_hdop = data.hdop
                 }
@@ -478,23 +482,24 @@ export default class DataController extends ParamsHandler {
                 this.params.lv_cur_power = data[0] / 1000
                 this.params.lv_cur_voltage = data[1]
                 this.params.lv_cur_amp = data[2] / 1000
+            })
 
-                const current_time = this.main.uptime
-                if (this.last_ina_update > 0) {
-                    this.params.lv_cons_cap += (current_time - this.last_ina_update) * (this.previous_ina_current + this.params.lv_cur_amp) / (1000 * 2)
-                    this.previous_ina_current = this.params.lv_cur_amp
-                }
-                this.last_imu_update = current_time
+            this.addParamListener(["lv_cons_energy", "lv_max_energy"], () => {
+                this.params.lv_bdi = (this.params.lv_max_energy - this.params.lv_cons_energy) / this.params.lv_max_energy
             })
 
             this.ina.startPoll(100)
         }
 
         if (this.can_driver) {
-            this.can_driver = new CanDriver()
+            this.can_driver.on("error", (err) => this.main.logs_controller.error("CAN Error:", err))
             this.can_driver.on("data", (raw_data: number[]) => {
                 this.params.hv_cur_temp = Math.max(raw_data[1], raw_data[2], raw_data[3]) / 100
-		this.params.hv_cur_amp = raw_data[0] / 10 // TODO re-add this after checking why this is not working
+                this.params.hv_cur_amp = raw_data[0] / 10
+            })
+
+            this.addParamListener(["hv_cons_energy", "hv_max_energy"], () => {
+                this.params.hv_bdi = (this.params.hv_max_energy - this.params.hv_cons_energy) / this.params.lv_max_energy
             })
         }
 
@@ -516,10 +521,52 @@ export default class DataController extends ParamsHandler {
             this.params.vehicle_power = this.params.hv_cur_amp * this.params.hv_cur_voltage
         })
 
-        this.addParamListener("throttle_output", ({value}) => {
-            if (!this.main.isInSystemMode(MavModeFlag.HIL_ENABLED)) {
-                //this.params.hv_cur_amp = this.params.hv_max_amp * value
+        this.addParamListener("hv_cur_amp", () => {
+            const current_time = this.main.uptime
+            if (this.last_hv_current_update > 0) {
+                this.params.hv_cons_cap += (current_time - this.last_hv_current_update) * (this.previous_hv_current + this.params.hv_cur_amp) / (1000 * 2)
+                this.previous_hv_current = this.params.hv_cur_amp
+                this.saveParam("hv_cons_cap", this.params.hv_cons_cap)
             }
+            this.last_hv_current_update = current_time
+        })
+
+        this.addParamListener("vehicle_power", () => {
+            const current_time = this.main.uptime
+            if (this.last_hv_power_update > 0) {
+                this.params.hv_cons_energy += (current_time - this.last_hv_power_update) * (this.previous_hv_power + this.params.vehicle_power) / (1000 * 2 * 3600)
+                this.previous_hv_power = this.params.vehicle_power
+                this.saveParam("hv_cons_energy", this.params.hv_cons_energy)
+            }
+            this.last_hv_power_update = current_time
+        })
+
+        this.addParamListener(["hv_cons_energy", "hv_max_energy"], () => {
+            this.params.hv_bdi = Math.max(0, (this.params.hv_max_energy - this.params.hv_cons_energy) / this.params.hv_max_energy)
+        })
+
+        this.addParamListener("lv_cur_amp", () => {
+            const current_time = this.main.uptime
+            if (this.last_ina_current_update > 0) {
+                this.params.lv_cons_cap += (current_time - this.last_ina_current_update) * (this.previous_ina_current + this.params.lv_cur_amp) / (1000 * 2)
+                this.previous_ina_current = this.params.lv_cur_amp
+                this.saveParam("lv_cons_cap", this.params.lv_cons_cap)
+            }
+            this.last_ina_current_update = current_time
+        })
+
+        this.addParamListener("lv_cur_power", () => {
+            const current_time = this.main.uptime
+            if (this.last_ina_power_update > 0) {
+                this.params.lv_cons_energy += (current_time - this.last_ina_power_update) * (this.previous_ina_power + this.params.lv_cur_power) / (1000 * 2 * 3600)
+                this.previous_ina_power = this.params.lv_cur_power
+                this.saveParam("lv_cons_energy", this.params.lv_cons_energy)
+            }
+            this.last_ina_power_update = current_time
+        })
+
+        this.addParamListener(["lv_cons_energy", "lv_max_energy"], () => {
+            this.params.lv_bdi = Math.max(0, (this.params.lv_max_energy - this.params.lv_cons_energy) / this.params.lv_max_energy)
         })
 
         await this.main.logs_controller.debug("Data controller initialized!")
@@ -545,6 +592,7 @@ export default class DataController extends ParamsHandler {
 
         this.params.vehicle_speed = Math.round(vehicle_speed / (speeds_used == 0 ? 1 : speeds_used))
     }
+
 
     async startSendingDataLog(log_id: number, sys_id: number, comp_id: number) {
         this.stop_sending_logging_data = false

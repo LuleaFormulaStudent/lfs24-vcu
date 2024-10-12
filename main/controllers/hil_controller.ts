@@ -38,10 +38,10 @@ export default class HILController {
                 }
 
                 this.main.data_controller.params.hv_cur_amp = values[0]
-                this.main.data_controller.params.hv_cons_energy = values[1]
+                //this.main.data_controller.params.hv_cons_energy = values[1]
                 this.main.data_controller.params.hv_cur_voltage = values[3]
                 this.main.data_controller.params.hv_cur_temp = values[4] - 273.15
-                this.main.data_controller.params.hv_bdi = values[5]
+                //this.main.data_controller.params.hv_bdi = values[5]
                 this.main.data_controller.params.gps_latitude = values[6]
                 this.main.data_controller.params.gps_longitude = values[7]
                 this.main.data_controller.params.vehicle_heading = values[8]
@@ -59,9 +59,9 @@ export default class HILController {
                 this.main.data_controller.params.throttle_output = values[20]
                 this.main.data_controller.params.brake_input = values[21]
                 this.main.data_controller.params.lv_cur_amp = values[22]
-                this.main.data_controller.params.lv_cons_energy = values[23]
+                //this.main.data_controller.params.lv_cons_energy = values[23]
                 this.main.data_controller.params.lv_cur_voltage = values[24]
-                this.main.data_controller.params.lv_bdi = values[25]
+                //this.main.data_controller.params.lv_bdi = values[25]
                 this.main.data_controller.params.lv_cur_power = this.main.data_controller.params.lv_cur_voltage * this.main.data_controller.params.lv_cur_amp
 
             })

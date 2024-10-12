@@ -1,6 +1,6 @@
 {
     "name": "mavlink-router",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "description": "Control software and system for LFS24 Project car",
     "main": "mavlink_router.ts",
     "type": "commonjs",

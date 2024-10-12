@@ -1,6 +1,6 @@
 {
     "name": "lfs24-vcu",
-    "version": "1.2.2",
+    "version": "1.2.3",
     "description": "Control software and system for LFS24 Project car",
     "main": "main.ts",
     "type": "commonjs",
