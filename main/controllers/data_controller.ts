@@ -16,6 +16,7 @@ import CanDriver from "../libs/can_driver.js";
 import {exec} from "node:child_process";
 import {encode} from "@msgpack/msgpack";
 import {deflateRawSync} from "node:zlib";
+import ValueEstimator from "../libs/value_estimator";
 
 export const INT16_MAX = 2 ** 15 - 1
 export const INT32_MAX = 2 ** 31 - 1
@@ -54,6 +55,8 @@ export default class DataController extends ParamsHandler {
     gps_time_set = false
 
     stop_sending_logging_data = false
+
+    voc_estimator = new ValueEstimator()
 
     constructor(private main: Main) {
         super({
@@ -521,7 +524,7 @@ export default class DataController extends ParamsHandler {
             this.params.vehicle_power = this.params.hv_cur_amp * this.params.hv_cur_voltage
         })
 
-        this.addParamListener("hv_cur_amp", () => {
+        this.addParamListener("hv_cur_amp", ({value}) => {
             const current_time = this.main.uptime
             if (this.last_hv_current_update > 0) {
                 this.params.hv_cons_cap += (current_time - this.last_hv_current_update) * (this.previous_hv_current + this.params.hv_cur_amp) / (1000 * 2)
@@ -529,6 +532,8 @@ export default class DataController extends ParamsHandler {
                 this.saveParam("hv_cons_cap", this.params.hv_cons_cap)
             }
             this.last_hv_current_update = current_time
+
+            this.params.hv_cur_voltage = this.voc_estimator.getClosestY(1 - this.params.hv_bdi) * 32 - value * 0.7e-3
         })
 
         this.addParamListener("vehicle_power", () => {
