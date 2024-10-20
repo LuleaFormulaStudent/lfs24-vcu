@@ -8,7 +8,8 @@ import {
     minimal,
     registerCustomMessageMagicNumber,
     send,
-    waitFor
+    waitFor,
+    sleep
 } from 'node-mavlink'
 import {Writable} from "node:stream";
 import {MavAutopilot, MavComponent, MavModeFlag, MavType} from "mavlink-mappings/dist/lib/minimal.js";
@@ -54,7 +55,7 @@ export default class MavlinkController {
 
     port_ready = false
 
-    private send_mav_messages = true
+    private send_mav_messages = false
     mav_messages_interval_times: { [propName: number]: number } = {}
     mav_messages_intervals: { [propName: number]: any } = {}
 
@@ -221,8 +222,9 @@ export default class MavlinkController {
             this.shouldSendMavMessages(false)
             for (let i = 0; i < params_keys.length; i++) {
                 await this.send(this.create_param_msg(params_keys[i], i, params_keys.length))
+		await sleep(100)
             }
-            this.shouldSendMavMessages(true)
+//            this.shouldSendMavMessages(true)
         } else if (data instanceof common.ParamRequestRead) {
             await this.send(this.create_param_msg(data.paramId, data.paramIndex))
         } else if (data instanceof common.ParamSet) {
@@ -256,7 +258,6 @@ export default class MavlinkController {
             this.main.data_controller.params.radio_remnoise = data.remnoise
             this.main.data_controller.params.radio_rxerrors = data.rxerrors
             this.main.data_controller.params.radio_fixed = data.fixed
-            await this.send(data)
         } else if (data instanceof common.FileTransferProtocol) {
             await this.onFTPEvent(data, sys_id, comp_id)
         } else if (data instanceof common.CommandLong && data.command == common.MavCmd.LOGGING_START) {

@@ -7,8 +7,8 @@ services:
         ports:
             - "8086:8086"
         volumes:
-            - ./data/influxdb-data:/var/lib/influxdb2
-            - ./data/influxdb-config:/etc/influxdb2
+            - ./data-prod-3/influxdb-data:/var/lib/influxdb2
+            - ./data-prod-3/influxdb-config:/etc/influxdb2
 
     lfs_vcu_main:
         container_name: lfs-vcu-main
@@ -17,13 +17,12 @@ services:
         env_file: ./main/.env
         privileged: true
         restart: no
+        network_mode: host
         depends_on:
             mavlink_router:
                 condition: service_started
-        ports:
-            - "6000:6000"
         volumes:
-            - ./data:/lfs-vcu/data
+            - ./data-prod-3:/lfs-vcu/data
         extra_hosts:
             - "host.docker.internal:host-gateway"
 
@@ -40,4 +39,6 @@ services:
         ports:
             - "5432:5432"
         volumes:
-            - ./data:/mavlink-router/data
+            - ./data-prod-3:/mavlink-router/data
+        devices:
+            - "/dev/ttyUSB0:/dev/ttyAMA2"

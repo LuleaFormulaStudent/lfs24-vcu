@@ -632,7 +632,7 @@ export default class DataController extends ParamsHandler {
             })
         }
 
-        const chunk_size = 249
+        const chunk_size = 200
         const data_buffer = deflateRawSync(encode(data_obj))
         const chunks = Math.ceil(data_buffer.byteLength / chunk_size)
 
@@ -645,7 +645,7 @@ export default class DataController extends ParamsHandler {
         init_msg.length = init_msg.data.length
         init_msg.firstMessageOffset = 0
         init_msg.sequence = 0
-        const response = await this.main.mavlink_controller.sendWithAnswer(init_msg, common.LoggingAck)
+        const response = await this.main.mavlink_controller.sendWithAnswer(init_msg, common.LoggingAck, 5000)
         if (response != null) {
             let succeeded = true
             this.main.mavlink_controller.shouldSendMavMessages(false)
@@ -662,20 +662,22 @@ export default class DataController extends ParamsHandler {
                     data_chunk = new Uint8Array(data_buffer.subarray(i * chunk_size, (i + 1) * chunk_size))
                 }
                 msg.data = i < chunks ? Array.from(data_chunk) : []
-                msg.targetSystem = 254
-                msg.targetComponent = 1
+                msg.targetSystem = sys_id
+                msg.targetComponent = comp_id
                 msg.length = i < chunks ? data_chunk.length : 0
                 msg.firstMessageOffset = i % 255
                 msg.sequence = i % 255
-                const response = await this.main.mavlink_controller.sendWithAnswer(msg, common.LoggingAck)
-                if (response) {
-                    if (msg.sequence == i % 255) {
+		console.log(msg.sequence)                
+const response = <common.LoggingDataAcked> await this.main.mavlink_controller.sendWithAnswer(msg, common.LoggingAck, 2000)
+                
+		if (response) {
+                    if (response.sequence == i % 255) {
                         i++
-                        tri = 1
+                        tri = 0
                     } else {
                         tri++
                     }
-                } else if (tri > 5) {
+                } else if (tri >= 5) {
                     await this.main.logs_controller.error("Sending data logg failed after 5 tries.")
                     succeeded = false
                     break;
