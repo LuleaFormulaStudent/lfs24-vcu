@@ -104,8 +104,6 @@ export default class DataController extends ParamsHandler {
             gps_hdop: 0,
             gps_vdop: 0,
             gps_heading: 0,
-            dt_K_I: 0.22,
-            dt_K_V: 0.026,
             red_led_output: false,
             green_led_output: false,
             blue_led_output: false,
@@ -135,12 +133,18 @@ export default class DataController extends ParamsHandler {
             hv_max_amp: 650,
             hv_cur_amp: 0,
             hv_cur_temp: 0,
+            acc_lon_raw: 0,
+            acc_lat_raw: 0,
+            acc_ver_raw: 0,
+            gyro_lon_raw: 0,
+            gyro_lat_raw: 0,
+            gyro_ver_raw: 0,
             acc_lon: 0,
             acc_lat: 0,
-            acc_z: 0,
+            acc_ver: 0,
             gyro_lon: 0,
             gyro_lat: 0,
-            gyro_z: 0,
+            gyro_ver: 0,
             imu_temp: 0,
             imu_lon_speed: 0,
             ts_torque: 0,
@@ -323,7 +327,7 @@ export default class DataController extends ParamsHandler {
             if (this.main.isInSystemState(MavState.ACTIVE) && !this.main.isInSystemMode(MavModeFlag.TEST_ENABLED)) {
                 let point = new Point(this.measurement_name)
                     .tag('type', 'param')
-                    .timestamp(timestamp) // TODO: Change to use GPS time
+                    .timestamp(timestamp)
                 if (typeof value == "string") {
                     point.stringField(param, value)
                 } else if (typeof value == "number") {
@@ -339,12 +343,12 @@ export default class DataController extends ParamsHandler {
             this.imu.on("error", (err) => this.main.logs_controller.error("IMU Error:", err))
             this.imu.on("data", (data) => {
                 this.params.imu_temp = data[0]
-                this.params.acc_lat = data[1]
-                this.params.acc_lon = data[2]
-                this.params.acc_z = data[3]
-                this.params.gyro_lat = data[4]
-                this.params.gyro_lon = data[5]
-                this.params.gyro_z = data[6]
+                this.params.acc_lat_raw = data[1]
+                this.params.acc_lon_raw = data[2]
+                this.params.acc_ver_raw = data[3]
+                this.params.gyro_lat_raw = data[4]
+                this.params.gyro_lon_raw = data[5]
+                this.params.gyro_ver_raw = data[6]
 
                 const current_time = this.main.uptime
                 if (this.last_imu_update > 0) {
@@ -367,12 +371,10 @@ export default class DataController extends ParamsHandler {
                 this.params.steering_raw = data[2]
                 this.params.board_temp = (data[3] - 100) / 10
 
-                if (!this.main.isInSystemMode(MavModeFlag.HIL_ENABLED)) {
-                    const throttle_normalized = map_range(this.params.throttle_raw, this.params.throttle_raw_min, this.params.throttle_raw_max, 0, 1)
-                    this.params.throttle_input = map_range(Math.max(throttle_normalized, this.main.data_controller.params.throttle_dz), this.main.data_controller.params.throttle_dz, 1, 0, 1)
-                    const brake_normalized = map_range(this.params.brake_raw, this.params.brake_raw_min, this.params.brake_raw_max, 0, 1)
-                    this.params.brake_input = map_range(Math.max(brake_normalized, this.main.data_controller.params.brake_dz), this.main.data_controller.params.brake_dz, 1, 0, 1)
-                }
+                const throttle_normalized = map_range(this.params.throttle_raw, this.params.throttle_raw_min, this.params.throttle_raw_max, 0, 1)
+                this.params.throttle_input = map_range(Math.max(throttle_normalized, this.main.data_controller.params.throttle_dz), this.main.data_controller.params.throttle_dz, 1, 0, 1)
+                const brake_normalized = map_range(this.params.brake_raw, this.params.brake_raw_min, this.params.brake_raw_max, 0, 1)
+                this.params.brake_input = map_range(Math.max(brake_normalized, this.main.data_controller.params.brake_dz), this.main.data_controller.params.brake_dz, 1, 0, 1)
             })
 
             this.co_mcu.on("ts_active", (ts_active) => {
@@ -421,7 +423,10 @@ export default class DataController extends ParamsHandler {
                     this.params.gps_speed = data.speed / 3.6
                 }
                 if (data.hasOwnProperty("satsActive")) {
-                    this.params.gps_num_sats = data.satsActive
+                    this.params.gps_num_sats = data.satsActive.length
+                }
+                if (data.hasOwnProperty("satellites")) {
+                    this.params.gps_num_sats = data.satellites
                 }
                 if (data.hasOwnProperty("hdop")) {
                     this.params.gps_hdop = data.hdop
@@ -500,10 +505,6 @@ export default class DataController extends ParamsHandler {
                 this.params.hv_cur_temp = Math.max(raw_data[1], raw_data[2], raw_data[3]) / 100
                 this.params.hv_cur_amp = raw_data[0] / 10
             })
-
-            this.addParamListener(["hv_cons_energy", "hv_max_energy"], () => {
-                this.params.hv_bdi = (this.params.hv_max_energy - this.params.hv_cons_energy) / this.params.lv_max_energy
-            })
         }
 
         this.system_info.on("data", (data: SystemInfoData) => {
@@ -532,7 +533,6 @@ export default class DataController extends ParamsHandler {
                 this.saveParam("hv_cons_cap", this.params.hv_cons_cap)
             }
             this.last_hv_current_update = current_time
-
             this.params.hv_cur_voltage = this.voc_estimator.getClosestY(1 - this.params.hv_bdi) * 32 - value * 0.7e-3
         })
 
@@ -667,10 +667,9 @@ export default class DataController extends ParamsHandler {
                 msg.length = i < chunks ? data_chunk.length : 0
                 msg.firstMessageOffset = i % 255
                 msg.sequence = i % 255
-		console.log(msg.sequence)                
-const response = <common.LoggingDataAcked> await this.main.mavlink_controller.sendWithAnswer(msg, common.LoggingAck, 2000)
-                
-		if (response) {
+                const response = <common.LoggingDataAcked> await this.main.mavlink_controller.sendWithAnswer(msg, common.LoggingAck, 2000)
+
+                if (response) {
                     if (response.sequence == i % 255) {
                         i++
                         tri = 0

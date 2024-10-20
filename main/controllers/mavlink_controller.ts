@@ -8,8 +8,8 @@ import {
     minimal,
     registerCustomMessageMagicNumber,
     send,
-    waitFor,
-    sleep
+    sleep,
+    waitFor
 } from 'node-mavlink'
 import {Writable} from "node:stream";
 import {MavAutopilot, MavComponent, MavModeFlag, MavType} from "mavlink-mappings/dist/lib/minimal.js";
@@ -85,41 +85,31 @@ export default class MavlinkController {
         this.heartbeat.baseMode = MavModeFlag.MANUAL_INPUT_ENABLED
         this.heartbeat.systemStatus = this.main.data_controller.params.system_state
 
-        try {
-            this.pipe = this.port
-                .pipe(new MavLinkPacketSplitter())
-                .pipe(new MavLinkPacketParser())
-                .pipe(this.heartbeat)
-                .resume()
+        this.pipe = this.port
+            .pipe(new MavLinkPacketSplitter())
+            .pipe(new MavLinkPacketParser())
+            .pipe(this.heartbeat)
+            .resume()
 
-            this.pipe.on('data', async (packet: MavLinkPacket) => {
-                try {
-                    const clazz: MavLinkDataConstructor<MavLinkData> = this.REGISTRY[packet.header.msgid]
-                    if (clazz) {
-                        const packet_data = packet.protocol.data(packet.payload, clazz)
+        this.pipe.on('data', async (packet: MavLinkPacket) => {
+            try {
+                const clazz: MavLinkDataConstructor<MavLinkData> = this.REGISTRY[packet.header.msgid]
+                if (clazz) {
+                    const packet_data = packet.protocol.data(packet.payload, clazz)
 
-                        const target_system: number = "targetSystem" in packet_data ? packet_data["targetSystem"] as any : 0
-                        const target_component: MavComponent = "targetComponent" in packet_data ? packet_data["targetComponent"] as any : MavComponent.ALL
+                    const target_system: number = "targetSystem" in packet_data ? packet_data["targetSystem"] as any : 0
+                    const target_component: MavComponent = "targetComponent" in packet_data ? packet_data["targetComponent"] as any : MavComponent.ALL
 
-                        //await this.main.logs_controller.debug(`Got ${packet_data.constructor.name} from: ${packet.header.sysid}|${packet.header.compid} to ${target_system}|${target_component}`)
-                        if (target_system > 0) {
-                            if (target_system == this.SYS_ID && (target_component == MavComponent.ALL || target_component == this.COMP_ID)) {
-                                await this.handle_packet(packet_data, packet.header.sysid, packet.header.compid)
-                            }
-                        } else {
-                            await this.handle_packet(packet_data, packet.header.sysid, packet.header.compid)
-                        }
+                    if (target_system == 0 || (target_system == this.SYS_ID && (target_component == MavComponent.ALL || target_component == this.COMP_ID))) {
+                        await this.handle_packet(packet_data, packet.header.sysid, packet.header.compid)
                     }
-                } catch (e) {
-                    await this.main.logs_controller.error("Error with data parsing:", e)
                 }
-            })
-                .on("error", (err: any) => {
-                    this.main.logs_controller.error("Pipeline Error:", err)
-                })
-        } catch (e) {
-            console.error(e)
-        }
+            } catch (e) {
+                await this.main.logs_controller.error("Error with data parsing:", e)
+            }
+        }).on("error", (err: any) => {
+            this.main.logs_controller.error("Pipeline Error:", err)
+        })
 
         this.port.on('connect', () => {
             this.on_port_ready()
@@ -132,13 +122,13 @@ export default class MavlinkController {
         this.heartbeat!.start()
         this.port_ready = true
 
-        this.createMsgInterval(common.BatteryStatus.MSG_ID, 500)
-        this.createMsgInterval(VehicleData.MSG_ID, 100)
-        this.createMsgInterval(ThrottleData.MSG_ID, 100)
-        this.createMsgInterval(BrakeData.MSG_ID, 100)
-        this.createMsgInterval(common.GpsRawInt.MSG_ID, 500)
-        this.createMsgInterval(common.RawImu.MSG_ID, 100)
-        this.createMsgInterval(ComputerStatus.MSG_ID, 1000)
+        this.setMsgInterval(common.BatteryStatus.MSG_ID, 500)
+        this.setMsgInterval(VehicleData.MSG_ID, 100)
+        this.setMsgInterval(ThrottleData.MSG_ID, 100)
+        this.setMsgInterval(BrakeData.MSG_ID, 100)
+        this.setMsgInterval(common.GpsRawInt.MSG_ID, 500)
+        this.setMsgInterval(common.RawImu.MSG_ID, 100)
+        this.setMsgInterval(ComputerStatus.MSG_ID, 1000)
     }
 
     async send(msg: MavLinkData | MavLinkData[]): Promise<boolean> {
@@ -222,9 +212,9 @@ export default class MavlinkController {
             this.shouldSendMavMessages(false)
             for (let i = 0; i < params_keys.length; i++) {
                 await this.send(this.create_param_msg(params_keys[i], i, params_keys.length))
-		await sleep(100)
+                await sleep(100)
             }
-//            this.shouldSendMavMessages(true)
+            this.shouldSendMavMessages(true)
         } else if (data instanceof common.ParamRequestRead) {
             await this.send(this.create_param_msg(data.paramId, data.paramIndex))
         } else if (data instanceof common.ParamSet) {
@@ -239,7 +229,7 @@ export default class MavlinkController {
         } else if (data instanceof common.LogRequestList) {
             await this.main.logs_controller.onLogListRequest(data.start, data.end)
         } else if (data instanceof common.CommandLong && data.command == common.MavCmd.SET_MESSAGE_INTERVAL) {
-            this.createMsgInterval(data._param1, data._param2)
+            this.setMsgInterval(data._param1, data._param2)
         } else if (data instanceof common.CommandLong && data.command == common.MavCmd.DO_MOTOR_TEST) {
             if (data._param2 == common.MotorTestThrottleType.THROTTLE_PERCENT) {
                 if (data._param3 == 0) {
@@ -294,7 +284,11 @@ export default class MavlinkController {
         return msg
     }
 
-    createMsgInterval(msg_id: number, interval: number) {
+    setMsgInterval(msg_id: number, interval: number) {
+        if (msg_id in this.mav_messages_intervals) {
+            clearInterval(this.mav_messages_intervals[msg_id])
+        }
+
         this.mav_messages_intervals[msg_id] = setInterval(async () => {
             if (this.send_mav_messages) {
                 const msg = this.createFromMsgID(msg_id)
@@ -383,12 +377,12 @@ export default class MavlinkController {
                 }
                 case common.RawImu.MSG_ID: {
                     const msg = new common.RawImu()
-                    msg.xacc = this.main.data_controller.params.acc_lat * 1000
-                    msg.yacc = this.main.data_controller.params.acc_lon * 1000
-                    msg.zacc = this.main.data_controller.params.acc_z * 1000
-                    msg.xgyro = this.main.data_controller.params.gyro_lat * 1000
-                    msg.ygyro = this.main.data_controller.params.gyro_lon * 1000
-                    msg.zgyro = this.main.data_controller.params.gyro_z * 1000
+                    msg.xacc = this.main.data_controller.params.acc_lat_raw * 1000
+                    msg.yacc = this.main.data_controller.params.acc_lon_raw * 1000
+                    msg.zacc = this.main.data_controller.params.acc_ver_raw * 1000
+                    msg.xgyro = this.main.data_controller.params.gyro_lat_raw * 1000
+                    msg.ygyro = this.main.data_controller.params.gyro_lon_raw * 1000
+                    msg.zgyro = this.main.data_controller.params.gyro_ver_raw * 1000
                     msg.temperature = this.main.data_controller.params.imu_temp * 100
                     return msg
                 }
@@ -396,10 +390,10 @@ export default class MavlinkController {
                     const msg = new common.ScaledImu()
                     msg.xacc = this.main.data_controller.params.acc_lat * 1000 / this.main.data_controller.params.g_constant
                     msg.yacc = this.main.data_controller.params.acc_lon * 1000 / this.main.data_controller.params.g_constant
-                    msg.zacc = this.main.data_controller.params.acc_z * 1000 / this.main.data_controller.params.g_constant
+                    msg.zacc = this.main.data_controller.params.acc_ver * 1000 / this.main.data_controller.params.g_constant
                     msg.xgyro = this.main.data_controller.params.gyro_lat * 1000
                     msg.ygyro = this.main.data_controller.params.gyro_lon * 1000
-                    msg.zgyro = this.main.data_controller.params.gyro_z * 1000
+                    msg.zgyro = this.main.data_controller.params.gyro_ver * 1000
                     msg.temperature = this.main.data_controller.params.imu_temp * 100
                     return msg
                 }

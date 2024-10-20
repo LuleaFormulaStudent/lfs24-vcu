@@ -8,7 +8,7 @@ export default class ParamsHandler extends EventEmitter {
 
     private storage = new LocalStorage("./data/params/")
 
-    constructor(params = {}, params_settings: {[propName: string]: {min?: number, max?: number}} = {}) {
+    constructor(params = {}, params_settings: { [propName: string]: { min?: number, max?: number } } = {}) {
         super()
         this.params = {
             __this: this,
@@ -20,18 +20,18 @@ export default class ParamsHandler extends EventEmitter {
             }
             Object.defineProperty(this.params, param, {
                 set(value) {
-                    if (this.__params_settings.hasOwnProperty(param)) {
-                        if (this.__params_settings[param].hasOwnProperty("min") && value < this.__params_settings[param].min) {
-                            this.__this.emit("warning", {error: "min", msg: "Min value triggered for " + param + "=" + value, param, value, timestamp: Date.now()})
-                        } else if (this.__params_settings[param].hasOwnProperty("max") && value > this.__params_settings[param].max) {
-                            this.__this.emit("warning", {error: "max", msg: "Max value triggered for " + param + "=" + value, timestamp: Date.now()})
-                        } else {
-                            this["_" + param] = value
-                            if (this.__this.events.hasOwnProperty(param)) {
-                                this.__this.events[param].emit("change", ({param, value, timestamp: Date.now()}))
-                            }
-                            this.__this.emit("change", ({param, value, timestamp: Date.now()}))
-                        }
+                    if (this.__params_settings.hasOwnProperty(param) && this.__params_settings[param].hasOwnProperty("min") && value < this.__params_settings[param].min) {
+                        this.__this.emit("warning", {
+                            error: "min",
+                            msg: "Min value triggered for " + param + "=" + value,
+                            param, value, timestamp: Date.now()
+                        })
+                    } else if (this.__params_settings.hasOwnProperty(param) && this.__params_settings[param].hasOwnProperty("max") && value > this.__params_settings[param].max) {
+                        this.__this.emit("warning", {
+                            error: "max",
+                            msg: "Max value triggered for " + param + "=" + value,
+                            param, value, timestamp: Date.now()
+                        })
                     } else {
                         this["_" + param] = value
                         if (this.__this.events.hasOwnProperty(param)) {
@@ -46,7 +46,7 @@ export default class ParamsHandler extends EventEmitter {
             });
         }
         for (const [key, val] of Object.entries(params)) {
-            this.params[key] = this.getParam(key)|| val
+            this.params[key] = this.getParam(key) || val
         }
     }
 
