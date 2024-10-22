@@ -95,6 +95,9 @@ export default class Main {
 
     async setSystemState(state: MavState) {
         this.data_controller.params.system_state = state
+        if (this.mavlink_controller.heartbeat) {
+            this.mavlink_controller.heartbeat.systemStatus = this.data_controller.params.system_state
+        }
         await this.logs_controller.info("Setting system in " + MavState[state].toLowerCase() + " state.")
     }
 
