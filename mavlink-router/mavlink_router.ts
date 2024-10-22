@@ -6,7 +6,8 @@ import {
     MavLinkPacket,
     MavLinkPacketParser,
     MavLinkPacketRegistry,
-    MavLinkPacketSplitter, MavLinkProtocolV2,
+    MavLinkPacketSplitter,
+    MavLinkProtocolV2,
     minimal,
     registerCustomMessageMagicNumber,
     send
@@ -37,7 +38,9 @@ export default class MavlinkRouter {
         backlog_interval: any | null
     }[] = []
 
-    slow_connections_backlog: { [propName: string]: { msg: MavLinkData, packet: MavLinkPacket }[] } = {}
+    slow_connections_backlog: {
+        [propName: string]: { msg: MavLinkData, from_sys_id: number, from_comp_id: number }[]
+    } = {}
     slow_connection_interval = parseInt(process.env.MLR_SLOW_CONNECTION_INTERVAL || "15")
     serial_devices = (process.env.MLR_SERIAL_DEVICES || "").split(",").map(device => device.trim())
 
@@ -123,9 +126,10 @@ export default class MavlinkRouter {
                                         console.log(this.slow_connections_backlog[this.toConnID(from_system, from_component)].length)
                                         const {
                                             msg,
-                                            packet
+                                            from_sys_id,
+                                            from_comp_id
                                         } = this.slow_connections_backlog[this.toConnID(from_system, from_component)].shift()!
-                                        this.send(connection, msg, from_system, from_component)
+                                        this.send(connection, msg, from_sys_id, from_comp_id)
                                     }
                                 }, this.slow_connection_interval) : null
                             })
@@ -141,7 +145,8 @@ export default class MavlinkRouter {
                                     if (this.connections[i].is_slow) {
                                         this.slow_connections_backlog[this.toConnID(this.connections[i].sys_id, this.connections[i].comp_id)].push({
                                             msg: packet_data,
-                                            packet
+                                            from_sys_id: from_system,
+                                            from_comp_id: from_component
                                         })
                                     } else {
                                         await this.send(this.connections[i].conn, packet_data, from_system, from_component)
@@ -154,7 +159,8 @@ export default class MavlinkRouter {
                                     if (this.connections[i].is_slow) {
                                         this.slow_connections_backlog[this.toConnID(this.connections[i].sys_id, this.connections[i].comp_id)].push({
                                             msg: packet_data,
-                                            packet
+                                            from_sys_id: from_system,
+                                            from_comp_id: from_component
                                         })
                                     } else {
                                         await this.send(this.connections[i].conn, packet_data, from_system, from_component)
