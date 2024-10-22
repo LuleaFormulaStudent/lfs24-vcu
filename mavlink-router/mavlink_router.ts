@@ -123,7 +123,7 @@ export default class MavlinkRouter {
                                 backlog_interval: slow_connection ? setInterval(() => {
                                     if (!(connection.destroyed || connection.writableFinished)
                                         && this.slow_connections_backlog[this.toConnID(from_system, from_component)].length) {
-                                        console.log(this.slow_connections_backlog[this.toConnID(from_system, from_component)].length)
+                                        //console.log(this.slow_connections_backlog[this.toConnID(from_system, from_component)].length)
                                         const {
                                             msg,
                                             from_sys_id,
