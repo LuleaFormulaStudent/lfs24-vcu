@@ -124,8 +124,8 @@ export default class MavlinkController {
 
         this.setMsgInterval(common.BatteryStatus.MSG_ID, 500)
         this.setMsgInterval(VehicleData.MSG_ID, 100)
-        this.setMsgInterval(ThrottleData.MSG_ID, 100)
-        this.setMsgInterval(BrakeData.MSG_ID, 100)
+        this.setMsgInterval(ThrottleData.MSG_ID, 200)
+        this.setMsgInterval(BrakeData.MSG_ID, 200)
         this.setMsgInterval(common.GpsRawInt.MSG_ID, 500)
         this.setMsgInterval(common.RawImu.MSG_ID, 100)
         this.setMsgInterval(ComputerStatus.MSG_ID, 1000)
@@ -369,6 +369,7 @@ export default class MavlinkController {
                 }
                 case VehicleData.MSG_ID: {
                     const msg = new VehicleData()
+                    console.log(this.main.data_controller.params.vehicle_power)
                     msg.power = this.main.data_controller.params.vehicle_power
                     msg.speed = this.main.data_controller.params.vehicle_speed
                     msg.heading = this.main.data_controller.params.vehicle_heading
