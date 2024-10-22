@@ -6,7 +6,7 @@ import {
     MavLinkPacket,
     MavLinkPacketParser,
     MavLinkPacketRegistry,
-    MavLinkPacketSplitter,
+    MavLinkPacketSplitter, MavLinkProtocolV2,
     minimal,
     registerCustomMessageMagicNumber,
     send
@@ -18,7 +18,7 @@ import {REGISTRY} from "mavlink-lib/dist/lfs"
 import {Writable} from "node:stream";
 import {MavComponent} from "mavlink-mappings/dist/lib/minimal";
 
-export default class Mavlink_router {
+export default class MavlinkRouter {
 
     tcp_server: Server
 
@@ -125,12 +125,12 @@ export default class Mavlink_router {
                                             msg,
                                             packet
                                         } = this.slow_connections_backlog[this.toConnID(from_system, from_component)].shift()!
-                                        this.send(connection, msg, packet)
+                                        this.send(connection, msg, from_system, from_component)
                                     }
                                 }, this.slow_connection_interval) : null
                             })
 
-                            //this.logs_controller.debug("Added new connection: " + `SYS ID: ${from_system} | COMP ID: ${from_component}`)
+                            this.logs_controller.debug("Added new connection: " + `SYS ID: ${from_system} | COMP ID: ${from_component}`)
                         }
 
                         if (target_system > 0) {
@@ -144,7 +144,7 @@ export default class Mavlink_router {
                                             packet
                                         })
                                     } else {
-                                        await this.send(this.connections[i].conn, packet_data, packet)
+                                        await this.send(this.connections[i].conn, packet_data, from_system, from_component)
                                     }
                                 }
                             }
@@ -157,15 +157,13 @@ export default class Mavlink_router {
                                             packet
                                         })
                                     } else {
-                                        await this.send(this.connections[i].conn, packet_data, packet)
+                                        await this.send(this.connections[i].conn, packet_data, from_system, from_component)
                                     }
                                 }
                             }
                         }
-//			if (packet_data.constructor.name.includes("Logging")) {
                         await this.logs_controller.debug(`Got ${packet_data.constructor.name} from: ${packet.header.sysid}|${packet.header.compid} to ${target_system}|${target_component}, (${packet.header.payloadLength} bytes)`)
-//			}                    
-}
+                    }
                 } catch (e) {
                     this.logs_controller.error("Error with packet parsing when routing:", e)
                 }
@@ -191,9 +189,9 @@ export default class Mavlink_router {
         })
     }
 
-    async send(conn: Socket | SerialPort, msg: MavLinkData, packet: MavLinkPacket): Promise<boolean> {
+    async send(conn: Socket | SerialPort, msg: MavLinkData, from_sys_id: number, from_comp_id: number): Promise<boolean> {
         try {
-            await send(<Writable>conn, msg, packet.protocol)
+            await send(<Writable>conn, msg, new MavLinkProtocolV2(from_sys_id, from_comp_id))
             return true
         } catch (e) {
             this.logs_controller.error("Error when routing msg (" + msg.constructor.name + "): ", e)
@@ -202,4 +200,4 @@ export default class Mavlink_router {
     }
 }
 
-(new Mavlink_router().init()).catch(console.error)
+(new MavlinkRouter().init()).catch(console.error)

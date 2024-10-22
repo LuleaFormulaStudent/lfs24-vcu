@@ -8,10 +8,6 @@ export default class LogsController {
 
     logs: { id: number, text: string, severity: common.MavSeverity }[] = []
     log_id: number = -1
-    ready_to_send = false
-
-    chunk_size = 47
-
     logs_path: string = (process.env.LOGS_PATH + "/mavlink-router") || ""
 
     constructor(private main: MavlinkRouter) {
