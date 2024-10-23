@@ -371,8 +371,8 @@ export default class MavlinkController {
                     const msg = new VehicleData()
                     msg.power = Math.round(this.main.data_controller.params.vehicle_power)
                     msg.speed = Math.round(this.main.data_controller.params.vehicle_speed)
-                    msg.heading = Math.round(this.main.data_controller.params.vehicle_heading * 100)
-                    msg.steering = Math.round(this.main.data_controller.params.vehicle_steering * 100)
+                    msg.heading = Math.round(this.main.data_controller.params.vehicle_heading * 10)
+                    msg.steering = Math.round(this.main.data_controller.params.vehicle_steering * 10)
                     return msg
                 }
                 case common.RawImu.MSG_ID: {
