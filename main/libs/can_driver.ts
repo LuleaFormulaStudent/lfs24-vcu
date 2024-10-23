@@ -1,7 +1,6 @@
 import {createRawChannel} from "socketcan"
 import {Message} from "*can.node";
 import EventEmitter from "node:events";
-import {sleep} from "node-mavlink";
 
 export default class CanDriver extends EventEmitter {
     private channel: any
