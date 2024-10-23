@@ -1,6 +1,6 @@
 import Main from "../main.js";
 import {MavState} from "mavlink-mappings/dist/lib/minimal.js";
-import {DrivingMode} from "mavlink-lib/dist/lfs.js";
+import {DrivingMode} from "mavlink-lib/typescript/lfs.js";
 
 export default class SteeringWheelController {
     driving_mode_forward_timeout: any

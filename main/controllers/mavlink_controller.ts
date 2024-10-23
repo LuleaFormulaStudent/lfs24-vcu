@@ -28,7 +28,7 @@ import {
     MavParamType,
     MavResult
 } from "mavlink-mappings/dist/lib/common.js";
-import {BrakeData, ComputerStatus, DrivingMode, REGISTRY, ThrottleData, VehicleData} from "mavlink-lib/dist/lfs.js"
+import {BrakeData, ComputerStatus, DrivingMode, REGISTRY, ThrottleData, VehicleData} from "mavlink-lib/typescript/lfs.js"
 import fs from "fs";
 import fsPromises from "fs/promises"
 import path from "path";

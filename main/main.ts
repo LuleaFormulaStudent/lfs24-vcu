@@ -9,11 +9,11 @@ import LogsController from "./controllers/logs_controller.js";
 import package_info from "./package.json"
 import {configDotenv} from "dotenv";
 import HILController from "./controllers/hil_controller.js";
-import {DrivingMode} from "mavlink-lib/dist/lfs.js";
+import {DrivingMode} from "mavlink-lib/typescript/lfs.js";
 import {exec} from "node:child_process";
 import AdmZip from "adm-zip";
 import fs from "fs";
-import {DrivingModeMessage} from "mavlink-lib/dist/lfs.js"
+import {DrivingModeMessage} from "mavlink-lib/typescript/lfs.js"
 
 configDotenv()
 

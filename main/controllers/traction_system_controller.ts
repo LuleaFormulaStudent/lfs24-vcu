@@ -3,7 +3,7 @@ import Main from "../main.js";
 import {MavModeFlag, MavState} from "mavlink-mappings/dist/lib/minimal.js";
 import {common, sleep, waitFor} from "node-mavlink";
 import {MavResult} from "mavlink-mappings/dist/lib/common.js";
-import {DrivingMode} from "mavlink-lib/dist/lfs.js";
+import {DrivingMode} from "mavlink-lib/typescript/lfs.js";
 
 export default class TractionSystemController {
 

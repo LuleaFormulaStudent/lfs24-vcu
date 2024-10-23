@@ -1,6 +1,6 @@
 import RelayBoard from "../libs/relay_board/relay_board.js";
 import Main from "../main.js";
-import {DigitalOutputsMessage} from "mavlink-lib/dist/lfs.js"
+import {DigitalOutputsMessage} from "mavlink-lib/typescript/lfs.js"
 
 export default class DigitalOutputsController {
 

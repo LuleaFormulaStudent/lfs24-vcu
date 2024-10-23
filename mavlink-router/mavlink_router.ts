@@ -15,7 +15,7 @@ import {
 import package_info from "./package.json"
 import LogsController from "./logs_controller";
 import {SerialPort} from "serialport";
-import {REGISTRY} from "mavlink-lib/dist/lfs"
+import {REGISTRY} from "mavlink-lib/typescript/lfs"
 import {Writable} from "node:stream";
 import {MavComponent} from "mavlink-mappings/dist/lib/minimal";
 

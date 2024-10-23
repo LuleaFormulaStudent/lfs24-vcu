@@ -6,7 +6,7 @@ import {common} from "node-mavlink";
 import ParamsHandler from "../libs/params_handler.js";
 import {InfluxDB, Point, QueryApi, WriteApi} from "@influxdata/influxdb-client";
 import {map_range} from "../libs/helper_functions.js";
-import {DrivingMode} from "mavlink-lib/dist/lfs.js";
+import {DrivingMode} from "mavlink-lib/typescript/lfs.js";
 import {GpsFixType} from "mavlink-mappings/dist/lib/common.js";
 import LSM6DS032 from "../libs/LSM6DS032/LSM6DS032.js";
 import SystemInfo, {SystemInfoData} from "../libs/system_info/system_info.js";
