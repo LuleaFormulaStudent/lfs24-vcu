@@ -55,7 +55,7 @@ export default class MavlinkController {
 
     port_ready = false
 
-    private send_mav_messages = false
+    private send_mav_messages = true
     mav_messages_interval_times: { [propName: number]: number } = {}
     mav_messages_intervals: { [propName: number]: any } = {}
 
@@ -369,11 +369,10 @@ export default class MavlinkController {
                 }
                 case VehicleData.MSG_ID: {
                     const msg = new VehicleData()
-                    console.log(this.main.data_controller.params.vehicle_power)
-                    msg.power = this.main.data_controller.params.vehicle_power
-                    msg.speed = this.main.data_controller.params.vehicle_speed
-                    msg.heading = this.main.data_controller.params.vehicle_heading
-                    msg.steering = this.main.data_controller.params.vehicle_steering
+                    msg.power = Math.round(this.main.data_controller.params.vehicle_power)
+                    msg.speed = Math.round(this.main.data_controller.params.vehicle_speed)
+                    msg.heading = Math.round(this.main.data_controller.params.vehicle_heading * 100)
+                    msg.steering = Math.round(this.main.data_controller.params.vehicle_steering * 100)
                     return msg
                 }
                 case common.RawImu.MSG_ID: {
