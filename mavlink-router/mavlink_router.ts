@@ -77,7 +77,7 @@ export default class MavlinkRouter {
         for (const path of this.serial_devices) {
             if (path) {
                 this.logs_controller.info("Registered new port: " + path)
-                const port = new SerialPort({path, baudRate: 57600});
+                const port = new SerialPort({path, baudRate: 115200});
                 this.setupConnection(port, true)
             }
         }
