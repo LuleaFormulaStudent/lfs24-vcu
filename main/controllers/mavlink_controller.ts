@@ -327,21 +327,24 @@ export default class MavlinkController {
                     lv_battery_msg.mode = MavBatteryMode.UNKNOWN
                     lv_battery_msg.voltages[0] = this.main.data_controller.params.lv_cur_voltage * 100
 
-                    const hv_battery_msg = new common.BatteryStatus()
-                    hv_battery_msg.id = 1
-                    hv_battery_msg.batteryFunction = MavBatteryFunction.PROPULSION
-                    hv_battery_msg.type = MavBatteryType.LIFE
-                    hv_battery_msg.batteryRemaining = Math.round(this.main.data_controller.params.hv_bdi * 100)
-                    hv_battery_msg.chargeState = MavBatteryChargeState.UNDEFINED
-                    hv_battery_msg.currentBattery = this.main.data_controller.params.hv_cur_amp * 10
-                    hv_battery_msg.timeRemaining = 0
-                    hv_battery_msg.temperature = this.main.data_controller.params.hv_cur_temp * 100
-                    hv_battery_msg.currentConsumed = this.main.data_controller.params.hv_cons_cap * 1000
-                    hv_battery_msg.energyConsumed = this.main.data_controller.params.hv_cons_energy * 1000
-                    hv_battery_msg.mode = MavBatteryMode.UNKNOWN
-                    hv_battery_msg.voltages[0] = this.main.data_controller.params.hv_cur_voltage * 100
-
-                    return [lv_battery_msg, hv_battery_msg]
+                    const msgs = [lv_battery_msg]
+                    if (!this.main.in_production) {
+                        const hv_battery_msg = new common.BatteryStatus()
+                        hv_battery_msg.id = 1
+                        hv_battery_msg.batteryFunction = MavBatteryFunction.PROPULSION
+                        hv_battery_msg.type = MavBatteryType.LIFE
+                        hv_battery_msg.batteryRemaining = Math.round(this.main.data_controller.params.hv_bdi * 100)
+                        hv_battery_msg.chargeState = MavBatteryChargeState.UNDEFINED
+                        hv_battery_msg.currentBattery = this.main.data_controller.params.hv_cur_amp * 10
+                        hv_battery_msg.timeRemaining = 0
+                        hv_battery_msg.temperature = this.main.data_controller.params.hv_cur_temp * 100
+                        hv_battery_msg.currentConsumed = this.main.data_controller.params.hv_cons_cap * 1000
+                        hv_battery_msg.energyConsumed = this.main.data_controller.params.hv_cons_energy * 1000
+                        hv_battery_msg.mode = MavBatteryMode.UNKNOWN
+                        hv_battery_msg.voltages[0] = this.main.data_controller.params.hv_cur_voltage * 100
+                        msgs.push(hv_battery_msg)
+                    }
+                    return msgs
                 }
                 case common.GpsRawInt.MSG_ID: {
                     const gps_msg = new common.GpsRawInt()
