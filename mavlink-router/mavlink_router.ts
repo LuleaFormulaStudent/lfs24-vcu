@@ -18,13 +18,12 @@ import {SerialPort} from "serialport";
 import {REGISTRY} from "mavlink-lib/typescript/lfs.js"
 import {Writable} from "node:stream";
 import {MavComponent} from "mavlink-mappings/dist/lib/minimal";
+import CanSocket from "./can_socket";
 
 export default class MavlinkRouter {
 
     tcp_server: Server
-
     tcp_server_stared = false
-
     logs_controller: LogsController
 
     in_production: boolean = process.env.NODE_ENV == 'production'
@@ -33,7 +32,7 @@ export default class MavlinkRouter {
     connections: {
         sys_id: number,
         comp_id: number,
-        conn: Socket | SerialPort,
+        conn: Socket | SerialPort | CanSocket,
         is_slow: boolean,
         backlog_interval: any | null
     }[] = []
@@ -81,13 +80,16 @@ export default class MavlinkRouter {
                 this.setupConnection(port, true)
             }
         }
+
+        this.logs_controller.info("Registering CAN connection on 'can0'")
+        this.setupConnection(new CanSocket(), true)
     }
 
     toConnID(sys_id: number, comp_id: number): string {
         return sys_id.toString() + "|" + comp_id.toString();
     }
 
-    setupConnection(connection: Socket | SerialPort, slow_connection: boolean = false) {
+    setupConnection(connection: Socket | SerialPort| CanSocket, slow_connection: boolean = false) {
         connection
             .pipe(new MavLinkPacketSplitter())
             .pipe(new MavLinkPacketParser())
@@ -195,7 +197,7 @@ export default class MavlinkRouter {
         })
     }
 
-    async send(conn: Socket | SerialPort, msg: MavLinkData, from_sys_id: number, from_comp_id: number): Promise<boolean> {
+    async send(conn: Socket | SerialPort | CanSocket, msg: MavLinkData, from_sys_id: number, from_comp_id: number): Promise<boolean> {
         try {
             await send(<Writable>conn, msg, new MavLinkProtocolV2(from_sys_id, from_comp_id))
             return true
