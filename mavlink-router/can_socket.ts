@@ -10,7 +10,9 @@ export default class CanSocket extends Duplex {
         super(options);
         this.channel = <RawChannel>createRawChannel(channel)
         this.channel.addListener("onMessage", (msg: Message) => {
-            this.buffer.push(...Array.from(msg.data))
+            if(!this.push(msg.data, "binary")) {
+                this.buffer.push(...Array.from(msg.data))
+            }
         });
         this.channel.start()
     }
@@ -31,10 +33,10 @@ export default class CanSocket extends Duplex {
 
     _read(size: number) {
         if (size <= this.buffer.length) {
-            this.push(Buffer.from(this.buffer.slice(0, size)));
+            this.push(Buffer.from(this.buffer.slice(0, size)), "binary");
             this.buffer.splice(0, size);
         } else {
-            this.push(Buffer.from(this.buffer.slice(0, this.buffer.length)));
+            this.push(Buffer.from(this.buffer.slice(0, this.buffer.length)), "binary");
             this.buffer.splice(0, this.buffer.length);
         }
     }
