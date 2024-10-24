@@ -28,7 +28,14 @@ import {
     MavParamType,
     MavResult
 } from "mavlink-mappings/dist/lib/common.js";
-import {BrakeData, ComputerStatus, DrivingMode, REGISTRY, ThrottleData, VehicleData} from "mavlink-lib/typescript/lfs.js"
+import {
+    BrakeData,
+    ComputerStatus,
+    DrivingMode,
+    REGISTRY,
+    ThrottleData,
+    VehicleData
+} from "mavlink-lib/typescript/lfs.js"
 import fs from "fs";
 import fsPromises from "fs/promises"
 import path from "path";
@@ -240,6 +247,13 @@ export default class MavlinkController {
             } else {
                 await this.sendCmdAck(common.MavCmd.DO_MOTOR_TEST, MavResult.UNSUPPORTED)
             }
+        } else if (data instanceof common.BatteryStatus) {
+            if (data.id == 1) {
+                this.main.data_controller.params.hv_cur_amp = data.currentBattery / 10
+                this.main.data_controller.params.hv_cur_temp = data.temperature / 100
+                this.main.data_controller.params.hv_cons_cap += data.currentConsumed / 1000
+                this.main.data_controller.params.hv_cons_energy += data.energyConsumed / 1000
+            }
         } else if (data instanceof common.RadioStatus) {
             this.main.data_controller.params.radio_rssi = data.rssi
             this.main.data_controller.params.radio_remrssi = data.remrssi
@@ -256,6 +270,8 @@ export default class MavlinkController {
             await this.main.data_controller.stopSendingDataLog()
         } else if (data instanceof common.LoggingData) {
             await this.main.data_controller.sendLoggingDataList(sys_id, comp_id)
+        } else if (data instanceof common.ButtonChange) {
+            await this.main.steering_wheel_controller.getButtonPress(data)
         } else if (!(data instanceof common.LoggingAck)) {
             await this.main.logs_controller.warning(`Received unknown msg: ${data.constructor.name} from: ${sys_id}|${comp_id}`)
         }
@@ -327,8 +343,8 @@ export default class MavlinkController {
                     lv_battery_msg.mode = MavBatteryMode.UNKNOWN
                     lv_battery_msg.voltages[0] = this.main.data_controller.params.lv_cur_voltage * 100
 
-                    const msgs = [lv_battery_msg]
-                    if (!this.main.in_production) {
+                    /*const msgs = [lv_battery_msg]
+                    if (!this.main.in_production && this.main.isInSystemMode(MavModeFlag.HIL_ENABLED)) {
                         const hv_battery_msg = new common.BatteryStatus()
                         hv_battery_msg.id = 1
                         hv_battery_msg.batteryFunction = MavBatteryFunction.PROPULSION
@@ -343,8 +359,8 @@ export default class MavlinkController {
                         hv_battery_msg.mode = MavBatteryMode.UNKNOWN
                         hv_battery_msg.voltages[0] = this.main.data_controller.params.hv_cur_voltage * 100
                         msgs.push(hv_battery_msg)
-                    }
-                    return msgs
+                    }*/
+                    return lv_battery_msg
                 }
                 case common.GpsRawInt.MSG_ID: {
                     const gps_msg = new common.GpsRawInt()
@@ -374,8 +390,9 @@ export default class MavlinkController {
                     const msg = new VehicleData()
                     msg.power = Math.round(this.main.data_controller.params.vehicle_power)
                     msg.speed = Math.round(this.main.data_controller.params.vehicle_speed)
-                    msg.heading = Math.round(this.main.data_controller.params.vehicle_heading * 10)
-                    msg.steering = Math.round(this.main.data_controller.params.vehicle_steering * 10)
+                    msg.bdi = Math.round(this.main.data_controller.params.hv_bdi * 100)
+                    msg.voltage = this.main.data_controller.params.hv_cur_voltage * 100
+                    msg.energyConsumed = this.main.data_controller.params.hv_cons_energy * 1000
                     return msg
                 }
                 case common.RawImu.MSG_ID: {

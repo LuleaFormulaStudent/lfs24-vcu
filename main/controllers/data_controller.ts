@@ -6,7 +6,7 @@ import {common} from "node-mavlink";
 import ParamsHandler from "../libs/params_handler.js";
 import {InfluxDB, Point, QueryApi, WriteApi} from "@influxdata/influxdb-client";
 import {map_range} from "../libs/helper_functions.js";
-import {DrivingMode} from "mavlink-lib/typescript/lfs.js";
+import {DrivingMode, DrivingModeMessage} from "mavlink-lib/typescript/lfs.js";
 import {GpsFixType} from "mavlink-mappings/dist/lib/common.js";
 import LSM6DS032 from "../libs/LSM6DS032/LSM6DS032.js";
 import SystemInfo, {SystemInfoData} from "../libs/system_info/system_info.js";
@@ -293,7 +293,7 @@ export default class DataController extends ParamsHandler {
             //this.ads = new ADS1115()
             this.imu = new LSM6DS032()
             this.ina = new INA260()
-            this.can_driver = new CanDriver()
+            //this.can_driver = new CanDriver()
         }
 
         const inlfuxdb = new InfluxDB({
@@ -572,6 +572,12 @@ export default class DataController extends ParamsHandler {
 
         this.addParamListener(["lv_cons_energy", "lv_max_energy"], () => {
             this.params.lv_bdi = Math.max(0, (this.params.lv_max_energy - this.params.lv_cons_energy) / this.params.lv_max_energy)
+        })
+
+        this.addParamListener("driving_mode", () => {
+            const msg = new DrivingModeMessage()
+            msg.drivingMode = this.params.driving_mode
+            this.main.mavlink_controller.send(msg)
         })
 
         await this.main.logs_controller.debug("Data controller initialized!")

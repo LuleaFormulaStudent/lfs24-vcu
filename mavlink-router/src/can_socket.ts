@@ -21,12 +21,7 @@ export default class CanSocket extends Duplex {
         const buf = Buffer.from(chunk)
         const chunks = Math.ceil(buf.byteLength / 8)
         for (let i = 0; i <= chunks; i++) {
-            this.channel.send({
-                id: 1,
-                ext: false,
-                rtr: false,
-                data: Buffer.from(buf.subarray(i * 8, (i + 1) * 8))
-            } as Message);
+            this.channel.send({id: 1, ext: false, rtr: false, data: Buffer.from(buf.subarray(i * 8, (i + 1) * 8))});
         }
         callback();
     }
