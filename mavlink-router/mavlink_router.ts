@@ -13,12 +13,12 @@ import {
     send
 } from "node-mavlink";
 import package_info from "./package.json"
-import LogsController from "./logs_controller";
+import LogsController from "./src/logs_controller";
 import {SerialPort} from "serialport";
 import {REGISTRY} from "mavlink-lib/typescript/lfs.js"
 import {Writable} from "node:stream";
 import {MavComponent} from "mavlink-mappings/dist/lib/minimal";
-import CanSocket from "./can_socket";
+import CanSocket from "./src/can_socket";
 
 export default class MavlinkRouter {
 
@@ -125,7 +125,6 @@ export default class MavlinkRouter {
                                 backlog_interval: slow_connection ? setInterval(() => {
                                     if (!(connection.destroyed || connection.writableFinished)
                                         && this.slow_connections_backlog[this.toConnID(from_system, from_component)].length) {
-                                        //console.log(this.slow_connections_backlog[this.toConnID(from_system, from_component)].length)
                                         const {
                                             msg,
                                             from_sys_id,
@@ -136,7 +135,7 @@ export default class MavlinkRouter {
                                 }, this.slow_connection_interval) : null
                             })
 
-                            this.logs_controller.debug("Added new connection: " + `SYS ID: ${from_system} | COMP ID: ${from_component}`)
+                            //this.logs_controller.debug("Added new connection: " + `SYS ID: ${from_system} | COMP ID: ${from_component}`)
                         }
 
                         if (target_system > 0) {

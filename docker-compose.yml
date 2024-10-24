@@ -27,7 +27,6 @@ services:
             - ./:/lfs-vcu/source
         network_mode: "host"
         devices:
-            - "/dev/serial0:/dev/ttyAMA0"
             - "/dev/ttyAMA5:/dev/ttyAMA5"
         extra_hosts:
             - "host.docker.internal:host-gateway"
@@ -39,9 +38,10 @@ services:
         env_file: ./mavlink-router/.env
         privileged: true
         restart: no
-        ports:
-            - "5432:5432"
+        network_mode: "host"
         volumes:
             - ./data:/mavlink-router/data
         devices:
             - "/dev/ttyAMA2:/dev/ttyAMA2"
+        extra_hosts:
+            - "host.docker.internal:host-gateway"

@@ -1,6 +1,7 @@
 import Main from "../main.js";
 import {MavState} from "mavlink-mappings/dist/lib/minimal.js";
 import {DrivingMode} from "mavlink-lib/typescript/lfs.js";
+import {common} from "node-mavlink";
 
 export default class SteeringWheelController {
     driving_mode_forward_timeout: any
@@ -12,7 +13,10 @@ export default class SteeringWheelController {
     }
 
     async init() {
-
         await this.main.logs_controller.debug("Steering wheel controller initialized!")
+    }
+
+    async getButtonPress(data: common.ButtonChange) {
+        console.log(data)
     }
 }

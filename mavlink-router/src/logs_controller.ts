@@ -1,4 +1,4 @@
-import MavlinkRouter from "./mavlink_router";
+import MavlinkRouter from "../mavlink_router";
 import {common, sleep} from "node-mavlink";
 import fs from "fs";
 import path from "path";
