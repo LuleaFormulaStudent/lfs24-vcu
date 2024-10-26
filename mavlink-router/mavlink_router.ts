@@ -89,7 +89,7 @@ export default class MavlinkRouter {
         return sys_id.toString() + "|" + comp_id.toString();
     }
 
-    setupConnection(connection: Socket | SerialPort| CanSocket, slow_connection: boolean = false) {
+    setupConnection(connection: Socket | SerialPort | CanSocket, slow_connection: boolean = false) {
         connection
             .pipe(new MavLinkPacketSplitter())
             .pipe(new MavLinkPacketParser())
@@ -138,33 +138,25 @@ export default class MavlinkRouter {
                             //this.logs_controller.debug("Added new connection: " + `SYS ID: ${from_system} | COMP ID: ${from_component}`)
                         }
 
+                        let sent_through_can = false
                         if (target_system > 0) {
                             for (let i = 0; i < this.connections.length; i++) {
                                 if (this.connections[i].conn !== connection
-                                    && this.connections[i].sys_id == target_system
-                                    && (target_component == 0 || this.connections[i].comp_id == target_component)) {
-                                    if (this.connections[i].is_slow) {
-                                        this.slow_connections_backlog[this.toConnID(this.connections[i].sys_id, this.connections[i].comp_id)].push({
-                                            msg: packet_data,
-                                            from_sys_id: from_system,
-                                            from_comp_id: from_component
-                                        })
-                                    } else {
-                                        await this.send(this.connections[i].conn, packet_data, from_system, from_component)
+                                    && (target_system == 0 || this.connections[i].sys_id == target_system
+                                        && (target_component == 0 || this.connections[i].comp_id == target_component))) {
+                                    if (!sent_through_can || !(this.connections[i].conn instanceof CanSocket)) {
+                                        if (this.connections[i].is_slow) {
+                                            this.slow_connections_backlog[this.toConnID(this.connections[i].sys_id, this.connections[i].comp_id)].push({
+                                                msg: packet_data,
+                                                from_sys_id: from_system,
+                                                from_comp_id: from_component
+                                            })
+                                        } else {
+                                            await this.send(this.connections[i].conn, packet_data, from_system, from_component)
+                                        }
                                     }
-                                }
-                            }
-                        } else {
-                            for (let i = 0; i < this.connections.length; i++) {
-                                if (this.connections[i].conn !== connection) {
-                                    if (this.connections[i].is_slow) {
-                                        this.slow_connections_backlog[this.toConnID(this.connections[i].sys_id, this.connections[i].comp_id)].push({
-                                            msg: packet_data,
-                                            from_sys_id: from_system,
-                                            from_comp_id: from_component
-                                        })
-                                    } else {
-                                        await this.send(this.connections[i].conn, packet_data, from_system, from_component)
+                                    if (this.connections[i].conn instanceof CanSocket) {
+                                        sent_through_can = true
                                     }
                                 }
                             }
