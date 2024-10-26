@@ -271,7 +271,7 @@ export default class MavlinkController {
         } else if (data instanceof common.LoggingData) {
             await this.main.data_controller.sendLoggingDataList(sys_id, comp_id)
         } else if (data instanceof common.ButtonChange) {
-            await this.main.steering_wheel_controller.getButtonPress(data)
+            await this.main.steering_wheel_controller.onButtonPress(data)
         } else if (!(data instanceof common.LoggingAck)) {
             await this.main.logs_controller.warning(`Received unknown msg: ${data.constructor.name} from: ${sys_id}|${comp_id}`)
         }

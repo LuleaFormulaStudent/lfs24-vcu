@@ -16,7 +16,7 @@ export default class SteeringWheelController {
         await this.main.logs_controller.debug("Steering wheel controller initialized!")
     }
 
-    async getButtonPress(data: common.ButtonChange) {
+    async onButtonPress(data: common.ButtonChange) {
         console.log(data)
     }
 }
