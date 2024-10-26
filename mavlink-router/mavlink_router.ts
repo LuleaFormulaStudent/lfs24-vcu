@@ -139,25 +139,23 @@ export default class MavlinkRouter {
                         }
 
                         let sent_through_can = false
-                        if (target_system > 0) {
-                            for (let i = 0; i < this.connections.length; i++) {
-                                if (this.connections[i].conn !== connection
-                                    && (target_system == 0 || this.connections[i].sys_id == target_system
-                                        && (target_component == 0 || this.connections[i].comp_id == target_component))) {
-                                    if (!sent_through_can || !(this.connections[i].conn instanceof CanSocket)) {
-                                        if (this.connections[i].is_slow) {
-                                            this.slow_connections_backlog[this.toConnID(this.connections[i].sys_id, this.connections[i].comp_id)].push({
-                                                msg: packet_data,
-                                                from_sys_id: from_system,
-                                                from_comp_id: from_component
-                                            })
-                                        } else {
-                                            await this.send(this.connections[i].conn, packet_data, from_system, from_component)
-                                        }
+                        for (let i = 0; i < this.connections.length; i++) {
+                            if (this.connections[i].conn !== connection
+                                && (target_system == 0 || this.connections[i].sys_id == target_system
+                                    && (target_component == 0 || this.connections[i].comp_id == target_component))) {
+                                if (!sent_through_can || !(this.connections[i].conn instanceof CanSocket)) {
+                                    if (this.connections[i].is_slow) {
+                                        this.slow_connections_backlog[this.toConnID(this.connections[i].sys_id, this.connections[i].comp_id)].push({
+                                            msg: packet_data,
+                                            from_sys_id: from_system,
+                                            from_comp_id: from_component
+                                        })
+                                    } else {
+                                        await this.send(this.connections[i].conn, packet_data, from_system, from_component)
                                     }
-                                    if (this.connections[i].conn instanceof CanSocket) {
-                                        sent_through_can = true
-                                    }
+                                }
+                                if (this.connections[i].conn instanceof CanSocket) {
+                                    sent_through_can = true
                                 }
                             }
                         }
