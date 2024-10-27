@@ -260,7 +260,7 @@ export default class MavlinkController {
             await this.main.data_controller.startSendingDataLog(data._param1, sys_id, comp_id)
         } else if (data instanceof common.CommandLong && data.command == common.MavCmd.LOGGING_STOP) {
             await this.main.data_controller.stopSendingDataLog()
-        } else if (data instanceof common.CommandLong && data.command == 50000) {
+        } else if (data instanceof common.CommandLong && <number> data.command == 50000) {
             await this.main.coolant_system_controller.handleCoolantPumpCmd(data)
         } else if (data instanceof common.LoggingData) {
             await this.main.data_controller.sendLoggingDataList(sys_id, comp_id)

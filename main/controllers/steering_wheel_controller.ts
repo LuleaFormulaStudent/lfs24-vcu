@@ -21,16 +21,16 @@ export default class SteeringWheelController {
     }
 
     async handleButtonChange(data: common.ButtonChange) {
-        if ((data.state & 1) != this.button_1_state) {
+        if (((data.state & 1) != 0) != this.button_1_state) {
             await this.onButtonPress(1, data.state & 1 ? "pressed" : "released")
         }
-        if ((data.state & 2) != this.button_2_state) {
+        if (((data.state & 2) != 0) != this.button_2_state) {
             await this.onButtonPress(2, data.state & 2 ? "pressed" : "released")
         }
-        if ((data.state & 3) != this.button_3_state) {
+        if (((data.state & 3) != 0) != this.button_3_state) {
             await this.onButtonPress(3, data.state & 3 ? "pressed" : "released")
         }
-        if ((data.state & 4) != this.button_4_state) {
+        if (((data.state & 4) != 0) != this.button_4_state) {
             await this.onButtonPress(4, data.state & 4 ? "pressed" : "released")
         }
     }

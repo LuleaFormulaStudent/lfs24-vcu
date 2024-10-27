@@ -5,8 +5,8 @@ export default class ParamsHandler extends EventEmitter {
 
     events: { [propName: string]: EventEmitter } = {}
     params: any = {}
-    paramToIndex: {[propName: string]: number}
-    indexToParam: {[propName: number]: string}
+    paramToIndex: {[propName: string]: number} = {}
+    indexToParam: {[propName: number]: string} = {}
     param_count: number = 0
 
     private storage = new LocalStorage("./data/params/")
