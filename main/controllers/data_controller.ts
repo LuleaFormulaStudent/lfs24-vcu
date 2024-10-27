@@ -45,11 +45,6 @@ export default class DataController extends ParamsHandler {
     last_ina_power_update: number = 0
     previous_ina_power: number = 0
 
-    last_hv_current_update: number = 0
-    previous_hv_current: number = 0
-    last_hv_power_update: number = 0
-    previous_hv_power: number = 0
-
     history_points_cache: Point[] = []
 
     gps_time_set = false
@@ -523,16 +518,15 @@ export default class DataController extends ParamsHandler {
             this.calculateVehicleSpeed()
         })
 
-        this.addParamListener(["hv_cur_amp", "hv_cur_voltage"], () => {
+        this.addParamListener("hv_cur_amp", ({value}) => {
+            this.params.hv_cur_voltage = this.voc_estimator.getClosestY(1 - this.params.hv_bdi) * 32 - value * 0.7e-3
             this.params.vehicle_power = this.params.hv_cur_amp * this.params.hv_cur_voltage
         })
 
         this.addParamListener("hv_cons_cap", ({value}) => {
-            this.params.hv_cur_voltage = this.voc_estimator.getClosestY(1 - this.params.hv_bdi) * 32 - value * 0.7e-3
-            if (this.last_hv_power_update > 0) {
-                this.params.hv_cons_energy += value * this.params.hv_cur_voltage
-                this.saveParam("hv_cons_energy", this.params.hv_cons_energy)
-            }
+            this.params.hv_cons_energy += value * this.params.hv_cur_voltage
+            this.saveParam("hv_cons_cap", this.params.hv_cons_cap)
+            this.saveParam("hv_cons_energy", this.params.hv_cons_energy)
         })
 
         /*this.addParamListener(["hv_cons_energy", "hv_max_energy"], () => {
