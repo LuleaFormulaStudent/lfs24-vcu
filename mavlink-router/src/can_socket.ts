@@ -11,7 +11,6 @@ export default class CanSocket extends Duplex {
         this.channel = <RawChannel>createRawChannel(channel)
         this.channel.addListener("onMessage", (msg: Message) => {
             if(!this.push(msg.data, "binary")) {
-		console.log("cannot push data")
                 this.buffer.push(...Array.from(msg.data))
             }
         });
@@ -21,7 +20,7 @@ export default class CanSocket extends Duplex {
     _write(chunk: any, encoding: any, callback: Function) {
         const buf = Buffer.from(chunk)
         const chunks = Math.ceil(buf.byteLength / 8)
-        for (let i = 0; i <= chunks; i++) {
+        for (let i = 0; i < chunks; i++) {
             this.channel.send({id: 1, ext: false, rtr: false, data: Buffer.from(buf.subarray(i * 8, (i + 1) * 8))});
         }
         callback();

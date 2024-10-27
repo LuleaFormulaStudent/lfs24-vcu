@@ -14,6 +14,7 @@ import {exec} from "node:child_process";
 import AdmZip from "adm-zip";
 import fs from "fs";
 import {DrivingModeMessage} from "mavlink-lib/typescript/lfs.js"
+import CoolantSystemController from "./controllers/coolant_system_controller";
 
 configDotenv()
 
@@ -27,6 +28,7 @@ export default class Main {
     mavlink_controller: MavlinkController
     logs_controller: LogsController
     hil_controller: HILController
+    coolant_system_controller: CoolantSystemController
 
     in_production: boolean = process.env.NODE_ENV == 'production'
     start_time: number = Date.now()
@@ -41,6 +43,7 @@ export default class Main {
         this.steering_wheel_controller = new SteeringWheelController(this)
         this.mavlink_controller = new MavlinkController(this)
         this.hil_controller = new HILController(this)
+        this.coolant_system_controller = new CoolantSystemController(this)
     }
 
     async init() {
@@ -85,6 +88,7 @@ export default class Main {
         await this.traction_system_controller.init()
         await this.steering_wheel_controller.init()
         await this.hil_controller.init()
+        await this.coolant_system_controller.init()
         await this.mavlink_controller.init()
 
         await this.logs_controller.info("Done initializing system!")

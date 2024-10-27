@@ -117,6 +117,7 @@ export default class DataController extends ParamsHandler {
             lv_bdi: 1,
             lv_max_energy: 3.45 * 55 * 4,
             lv_cons_cap: 0,
+            lv_max_cap: 50,
             lv_cons_energy: 0,
             lv_max_voltage: 3.45 * 4,
             lv_cur_voltage: 0,
@@ -126,6 +127,7 @@ export default class DataController extends ParamsHandler {
             lv_cur_power: 0,
             hv_bdi: 1,
             hv_max_energy: 5018, //3.45 * 55 * 32,
+            hv_max_cap: 50,
             hv_cons_cap: 0,
             hv_cons_energy: 0,
             hv_max_voltage: 3.45 * 32,
@@ -525,29 +527,20 @@ export default class DataController extends ParamsHandler {
             this.params.vehicle_power = this.params.hv_cur_amp * this.params.hv_cur_voltage
         })
 
-        this.addParamListener("hv_cur_amp", ({value}) => {
-            const current_time = this.main.uptime
-            if (this.last_hv_current_update > 0) {
-                this.params.hv_cons_cap += (current_time - this.last_hv_current_update) * (this.previous_hv_current + this.params.hv_cur_amp) / (1000 * 2)
-                this.previous_hv_current = this.params.hv_cur_amp
-                this.saveParam("hv_cons_cap", this.params.hv_cons_cap)
-            }
-            this.last_hv_current_update = current_time
+        this.addParamListener("hv_cons_cap", ({value}) => {
             this.params.hv_cur_voltage = this.voc_estimator.getClosestY(1 - this.params.hv_bdi) * 32 - value * 0.7e-3
-        })
-
-        this.addParamListener("vehicle_power", () => {
-            const current_time = this.main.uptime
             if (this.last_hv_power_update > 0) {
-                this.params.hv_cons_energy += (current_time - this.last_hv_power_update) * (this.previous_hv_power + this.params.vehicle_power) / (1000 * 2 * 3600)
-                this.previous_hv_power = this.params.vehicle_power
+                this.params.hv_cons_energy += value * this.params.hv_cur_voltage
                 this.saveParam("hv_cons_energy", this.params.hv_cons_energy)
             }
-            this.last_hv_power_update = current_time
         })
 
-        this.addParamListener(["hv_cons_energy", "hv_max_energy"], () => {
+        /*this.addParamListener(["hv_cons_energy", "hv_max_energy"], () => {
             this.params.hv_bdi = Math.max(0, (this.params.hv_max_energy - this.params.hv_cons_energy) / this.params.hv_max_energy)
+        })*/
+
+        this.addParamListener(["hv_cons_cap", "hv_max_cap"], () => {
+            this.params.hv_bdi = Math.max(0, (this.params.hv_max_cap - this.params.hv_cons_cap) / this.params.hv_max_cap)
         })
 
         this.addParamListener("lv_cur_amp", () => {
@@ -673,7 +666,7 @@ export default class DataController extends ParamsHandler {
                 msg.length = i < chunks ? data_chunk.length : 0
                 msg.firstMessageOffset = i % 255
                 msg.sequence = i % 255
-                const response = <common.LoggingDataAcked> await this.main.mavlink_controller.sendWithAnswer(msg, common.LoggingAck, 2000)
+                const response = <common.LoggingDataAcked>await this.main.mavlink_controller.sendWithAnswer(msg, common.LoggingAck, 2000)
 
                 if (response) {
                     if (response.sequence == i % 255) {

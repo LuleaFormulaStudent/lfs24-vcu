@@ -5,6 +5,9 @@ export default class ParamsHandler extends EventEmitter {
 
     events: { [propName: string]: EventEmitter } = {}
     params: any = {}
+    paramToIndex: {[propName: string]: number}
+    indexToParam: {[propName: number]: string}
+    param_count: number = 0
 
     private storage = new LocalStorage("./data/params/")
 
@@ -45,8 +48,14 @@ export default class ParamsHandler extends EventEmitter {
                 }
             });
         }
-        for (const [key, val] of Object.entries(params)) {
+        const entries = Object.entries(params)
+        this.param_count = entries.length
+        for (const [key, val] of entries) {
             this.params[key] = this.getParam(key) || val
+        }
+        for (let i = 0; i < this.param_count; i++) {
+            this.paramToIndex[entries[i][0]] = i
+            this.indexToParam[i] = entries[i][0]
         }
     }
 

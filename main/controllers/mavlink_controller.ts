@@ -34,7 +34,7 @@ import {
     DrivingMode,
     REGISTRY,
     ThrottleData,
-    VehicleData
+    VehicleData,
 } from "mavlink-lib/typescript/lfs.js"
 import fs from "fs";
 import fsPromises from "fs/promises"
@@ -215,24 +215,17 @@ export default class MavlinkController {
         if (data instanceof minimal.Heartbeat) {
 
         } else if (data instanceof common.ParamRequestList) {
-            const params_keys: string[] = this.main.data_controller.getParams()
             this.shouldSendMavMessages(false)
+            const params_keys: string[] = this.main.data_controller.getParams()
             for (let i = 0; i < params_keys.length; i++) {
-                await this.send(this.create_param_msg(params_keys[i], i, params_keys.length))
+                await this.send(this.createParamMsg(params_keys[i], -1))
                 await sleep(100)
             }
             this.shouldSendMavMessages(true)
         } else if (data instanceof common.ParamRequestRead) {
-            await this.send(this.create_param_msg(data.paramId, data.paramIndex))
+            await this.send(this.createParamMsg(data.paramId, data.paramIndex))
         } else if (data instanceof common.ParamSet) {
-            try {
-                this.main.data_controller.params[data.paramId] = data.paramValue
-                await this.send(this.create_param_msg(data.paramId, 0))
-                await this.main.logs_controller.info("Setting parameter: " + data.paramId + " = " + data.paramValue)
-                this.main.data_controller.saveParam(data.paramId, data.paramValue)
-            } catch (e: any) {
-                await this.main.logs_controller.error("Error setting parameter: (" + data.paramId + " = " + data.paramValue + "). " + e.toString())
-            }
+            await this.setParamFromMsg(data)
         } else if (data instanceof common.LogRequestList) {
             await this.main.logs_controller.onLogListRequest(data.start, data.end)
         } else if (data instanceof common.CommandLong && data.command == common.MavCmd.SET_MESSAGE_INTERVAL) {
@@ -252,7 +245,6 @@ export default class MavlinkController {
                 this.main.data_controller.params.hv_cur_amp = data.currentBattery / 10
                 this.main.data_controller.params.hv_cur_temp = data.temperature / 100
                 this.main.data_controller.params.hv_cons_cap += data.currentConsumed / 1000
-                this.main.data_controller.params.hv_cons_energy += data.energyConsumed / 1000
             }
         } else if (data instanceof common.RadioStatus) {
             this.main.data_controller.params.radio_rssi = data.rssi
@@ -268,36 +260,59 @@ export default class MavlinkController {
             await this.main.data_controller.startSendingDataLog(data._param1, sys_id, comp_id)
         } else if (data instanceof common.CommandLong && data.command == common.MavCmd.LOGGING_STOP) {
             await this.main.data_controller.stopSendingDataLog()
+        } else if (data instanceof common.CommandLong && data.command == 50000) {
+            await this.main.coolant_system_controller.handleCoolantPumpCmd(data)
         } else if (data instanceof common.LoggingData) {
             await this.main.data_controller.sendLoggingDataList(sys_id, comp_id)
         } else if (data instanceof common.ButtonChange) {
-            await this.main.steering_wheel_controller.onButtonPress(data)
+            await this.main.steering_wheel_controller.handleButtonChange(data)
         } else if (!(data instanceof common.LoggingAck)) {
             await this.main.logs_controller.warning(`Received unknown msg: ${data.constructor.name} from: ${sys_id}|${comp_id}`)
         }
     }
 
-    private create_param_msg(param_key: string, index = 1, count = 1): common.ParamValue {
+    private createParamMsg(param_key: string, index: number): common.ParamValue {
         const msg = new common.ParamValue()
-        msg.paramId = param_key
-        msg.paramCount = count
-        msg.paramIndex = index
+        if (index >= 0) {
+            msg.paramId = this.main.data_controller.indexToParam[index]
+            msg.paramIndex = index
+        } else {
+            msg.paramId = param_key
+            msg.paramIndex = this.main.data_controller.paramToIndex[param_key]
+        }
+        msg.paramCount = this.main.data_controller.param_count
 
-        if (typeof this.main.data_controller.params[param_key] == "number") {
-            if (Number.isInteger(this.main.data_controller.params[param_key])) {
+        if (typeof this.main.data_controller.params[msg.paramId] == "number") {
+            if (Number.isInteger(this.main.data_controller.params[msg.paramId])) {
                 msg.paramType = MavParamType.INT32
             } else {
                 msg.paramType = MavParamType.REAL32
             }
-            msg.paramValue = this.main.data_controller.params[param_key]
-        } else if (typeof this.main.data_controller.params[param_key] == "boolean") {
+            msg.paramValue = this.main.data_controller.params[msg.paramId]
+        } else if (typeof this.main.data_controller.params[msg.paramId] == "boolean") {
             msg.paramType = MavParamType.UINT8
-            msg.paramValue = this.main.data_controller.params[param_key] ? 1 : 0
+            msg.paramValue = this.main.data_controller.params[msg.paramId] ? 1 : 0
         } else {
             msg.paramType = MavParamType.INT32
-            msg.paramValue = this.main.data_controller.params[param_key]
+            msg.paramValue = this.main.data_controller.params[msg.paramId]
         }
         return msg
+    }
+
+    async setParamFromMsg(data: common.ParamSet) {
+        try {
+            if (typeof this.main.data_controller.params[data.paramId] == "boolean") {
+                this.main.data_controller.params[data.paramId] = data.paramValue == Math.round(1)
+            } else {
+                this.main.data_controller.params[data.paramId] = data.paramValue
+            }
+
+            await this.send(this.createParamMsg(data.paramId, 0))
+            await this.main.logs_controller.info("Setting parameter: " + data.paramId + " = " + data.paramValue)
+            this.main.data_controller.saveParam(data.paramId, data.paramValue)
+        } catch (e: any) {
+            await this.main.logs_controller.error("Error setting parameter: (" + data.paramId + " = " + data.paramValue + "). " + e.toString())
+        }
     }
 
     setMsgInterval(msg_id: number, interval: number) {

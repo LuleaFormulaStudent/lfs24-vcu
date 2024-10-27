@@ -159,9 +159,8 @@ export default class MavlinkRouter {
                                 }
                             }
                         }
-if (packet_data.constructor.name.toLowerCase().includes("button") || packet_data.constructor.name.toLowerCase().includes("param")) {
-                        await this.logs_controller.debug(`Got ${packet_data.constructor.name} from: ${packet.header.sysid}|${packet.header.compid} to ${target_system}|${target_component}, (${packet.header.payloadLength} bytes)`)
-                    }}
+                        //await this.logs_controller.debug(`Got ${packet_data.constructor.name} from: ${packet.header.sysid}|${packet.header.compid} to ${target_system}|${target_component}, (${packet.header.payloadLength} bytes)`)
+                    }
                 } catch (e) {
                     this.logs_controller.error("Error with packet parsing when routing:", e)
                 }
