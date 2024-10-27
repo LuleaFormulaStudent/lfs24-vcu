@@ -13,7 +13,7 @@ export default class CoolantSystemController {
     async handleCoolantPumpCmd(data: common.CommandLong) {
         console.log(data)
         if (data._param1 > 0) {
-            this.main.digital_outputs_controller.setCoolantPumpOutput(data._param1 == 1)
+            this.main.digital_outputs_controller.setCoolantPumpOutput(data._param1 == 2)
             if (data._param1 == 1) {
                 await this.main.logs_controller.info("Activating coolant pump")
             } else {
@@ -21,8 +21,8 @@ export default class CoolantSystemController {
             }
         }
         if (data._param2 > 0) {
-            this.main.data_controller.params.cool_pump_start = data._param2 == 1
-            this.main.data_controller.saveParam("cool_pump_start", data._param2 == 1)
+            this.main.data_controller.params.cool_pump_start = data._param2 == 2
+            this.main.data_controller.saveParam("cool_pump_start", data._param2 == 2)
             await this.main.logs_controller.info("Changing behavior for coolant pump on startup: " + (data._param2 == 1))
         }
     }

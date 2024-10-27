@@ -307,7 +307,7 @@ export default class MavlinkController {
                 this.main.data_controller.params[data.paramId] = data.paramValue
             }
 
-            await this.send(this.createParamMsg(data.paramId, 0))
+            await this.send(this.createParamMsg(data.paramId, -1))
             await this.main.logs_controller.info("Setting parameter: " + data.paramId + " = " + data.paramValue)
             this.main.data_controller.saveParam(data.paramId, data.paramValue)
         } catch (e: any) {
