@@ -208,6 +208,6 @@ export default class ValueEstimator {
     }
 
     getClosestY(x: number): number {
-        return this.data[Math.round(x*201)];
+        return this.data[Math.round(x*200)];
     }
 }

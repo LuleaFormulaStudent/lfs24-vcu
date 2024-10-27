@@ -518,6 +518,10 @@ export default class DataController extends ParamsHandler {
             this.calculateVehicleSpeed()
         })
 
+        this.addParamListener(["hv_cons_cap", "hv_max_cap"], () => {
+            this.params.hv_bdi = Math.max(0, (this.params.hv_max_cap - this.params.hv_cons_cap) / this.params.hv_max_cap)
+        })
+
         this.addParamListener("hv_cur_amp", ({value}) => {
             this.params.hv_cur_voltage = this.voc_estimator.getClosestY(1 - this.params.hv_bdi) * 32 - value * 0.7e-3
             this.params.vehicle_power = this.params.hv_cur_amp * this.params.hv_cur_voltage
@@ -534,10 +538,6 @@ export default class DataController extends ParamsHandler {
         /*this.addParamListener(["hv_cons_energy", "hv_max_energy"], () => {
             this.params.hv_bdi = Math.max(0, (this.params.hv_max_energy - this.params.hv_cons_energy) / this.params.hv_max_energy)
         })*/
-
-        this.addParamListener(["hv_cons_cap", "hv_max_cap"], () => {
-            this.params.hv_bdi = Math.max(0, (this.params.hv_max_cap - this.params.hv_cons_cap) / this.params.hv_max_cap)
-        })
 
         this.addParamListener("lv_cur_amp", () => {
             const current_time = this.main.uptime
