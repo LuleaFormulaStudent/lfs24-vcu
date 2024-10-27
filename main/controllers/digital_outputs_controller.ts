@@ -45,7 +45,7 @@ export default class DigitalOutputsController {
         if (val != this.main.data_controller.params.reverse_output) {
             this.main.data_controller.params.reverse_output = val
             if (this.board) {
-                this.board.setOutput(4, val)
+                this.board.setOutput(4, !val)
             }
             if (should_send) {
                 this.sendDOMessage()
