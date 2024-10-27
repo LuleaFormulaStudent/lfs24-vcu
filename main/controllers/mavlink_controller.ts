@@ -245,6 +245,7 @@ export default class MavlinkController {
                 this.main.data_controller.params.hv_cur_amp = data.currentBattery / 10
                 this.main.data_controller.params.hv_cur_temp = data.temperature / 100
                 this.main.data_controller.params.hv_cons_cap += data.currentConsumed / 1000
+                this.main.data_controller.params.hv_cons_energy += data.currentConsumed * this.main.data_controller.params.hv_cur_voltage / 1000
             }
         } else if (data instanceof common.RadioStatus) {
             this.main.data_controller.params.radio_rssi = data.rssi
@@ -260,7 +261,7 @@ export default class MavlinkController {
             await this.main.data_controller.startSendingDataLog(data._param1, sys_id, comp_id)
         } else if (data instanceof common.CommandLong && data.command == common.MavCmd.LOGGING_STOP) {
             await this.main.data_controller.stopSendingDataLog()
-        } else if (data instanceof common.CommandLong && <number> data.command == 50000) {
+        } else if (data instanceof common.CommandLong && <number>data.command == 50000) {
             await this.main.coolant_system_controller.handleCoolantPumpCmd(data)
         } else if (data instanceof common.LoggingData) {
             await this.main.data_controller.sendLoggingDataList(sys_id, comp_id)

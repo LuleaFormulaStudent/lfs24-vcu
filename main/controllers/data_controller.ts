@@ -523,9 +523,11 @@ export default class DataController extends ParamsHandler {
             this.params.vehicle_power = this.params.hv_cur_amp * this.params.hv_cur_voltage
         })
 
-        this.addParamListener("hv_cons_cap", ({value}) => {
-            this.params.hv_cons_energy += value * this.params.hv_cur_voltage
+        this.addParamListener("hv_cons_cap", () => {
             this.saveParam("hv_cons_cap", this.params.hv_cons_cap)
+        })
+
+        this.addParamListener("hv_cons_energy", () => {
             this.saveParam("hv_cons_energy", this.params.hv_cons_energy)
         })
 
