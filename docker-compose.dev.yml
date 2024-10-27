@@ -36,8 +36,7 @@ services:
         depends_on:
             database:
                 condition: service_started
-        ports:
-            - "5432:5432"
+        network_mode: host
         volumes:
             - ./data-prod-3:/mavlink-router/data
         devices:

@@ -9,7 +9,7 @@ lerna-debug.log*
 .pnpm-debug.log*
 package-lock.json
 data
-data-prod
+data*
 .idea
 .git-credentials
 

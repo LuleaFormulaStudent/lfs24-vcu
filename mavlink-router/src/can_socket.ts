@@ -11,6 +11,7 @@ export default class CanSocket extends Duplex {
         this.channel = <RawChannel>createRawChannel(channel)
         this.channel.addListener("onMessage", (msg: Message) => {
             if(!this.push(msg.data, "binary")) {
+		console.log("cannot push data")
                 this.buffer.push(...Array.from(msg.data))
             }
         });

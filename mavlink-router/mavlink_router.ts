@@ -76,7 +76,7 @@ export default class MavlinkRouter {
         for (const path of this.serial_devices) {
             if (path) {
                 this.logs_controller.info("Registered new port: " + path)
-                const port = new SerialPort({path, baudRate: 115200});
+                const port = new SerialPort({path, baudRate: 57600});
                 this.setupConnection(port, true)
             }
         }
@@ -135,10 +135,10 @@ export default class MavlinkRouter {
                                 }, this.slow_connection_interval) : null
                             })
 
-                            //this.logs_controller.debug("Added new connection: " + `SYS ID: ${from_system} | COMP ID: ${from_component}`)
+                            this.logs_controller.debug("Added new connection: " + `SYS ID: ${from_system} | COMP ID: ${from_component}`)
                         }
 
-                        let sent_through_can = false
+                        let sent_through_can = connection instanceof CanSocket
                         for (let i = 0; i < this.connections.length; i++) {
                             if (this.connections[i].conn !== connection
                                 && (target_system == 0 || this.connections[i].sys_id == target_system
@@ -159,8 +159,9 @@ export default class MavlinkRouter {
                                 }
                             }
                         }
+if (packet_data.constructor.name.toLowerCase().includes("button") || packet_data.constructor.name.toLowerCase().includes("param")) {
                         await this.logs_controller.debug(`Got ${packet_data.constructor.name} from: ${packet.header.sysid}|${packet.header.compid} to ${target_system}|${target_component}, (${packet.header.payloadLength} bytes)`)
-                    }
+                    }}
                 } catch (e) {
                     this.logs_controller.error("Error with packet parsing when routing:", e)
                 }
