@@ -1,5 +1,5 @@
 import Main from "../main.js";
-import {common} from "node-mavlink";
+import {common, sleep} from "node-mavlink";
 import fs from "fs";
 import path from "path";
 import {MavSeverity} from "mavlink-mappings/dist/lib/common.js";
@@ -97,7 +97,7 @@ export default class LogsController {
                 msg.text += "<@>"
             }
             if (!await this.main.mavlink_controller.send(msg)) {
-                console.log("Failed to send log")
+                console.error("Failed to send log")
             }
         }
     }
@@ -113,6 +113,7 @@ export default class LogsController {
 
             for (let i: number = start_id; i < Math.min(end_id + 1, this.logs.length); i++) {
                 await this.sendLogMsg(this.logs[i].id, this.logs[i].severity, this.logs[i].text)
+                await sleep(100)
             }
             this.ready_to_send = true
         } catch (err) {
