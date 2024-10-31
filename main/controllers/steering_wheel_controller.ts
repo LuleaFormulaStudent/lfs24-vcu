@@ -50,9 +50,9 @@ export default class SteeringWheelController {
         if (event == "pressed" && button == BUTTONS.BUTTON_3) {
             this.driving_mode_forward_timeout = setTimeout(() => {
                 if (this.main.data_controller.params.driving_mode == DrivingMode.NEUTRAL) {
-                    this.main.setDrivingMode(DrivingMode.FORWARD)
+                    this.main.traction_system_controller.setDrivingDirection(DrivingMode.FORWARD)
                 } else {
-                    this.main.setDrivingMode(DrivingMode.NEUTRAL)
+                    this.main.traction_system_controller.setDrivingDirection(DrivingMode.NEUTRAL)
                 }
             }, 1000)
         } else if (event == "released" && button == BUTTONS.BUTTON_3) {
@@ -61,9 +61,9 @@ export default class SteeringWheelController {
         if (event == "pressed" && button == BUTTONS.BUTTON_2) {
             this.driving_mode_reverse_timeout = setTimeout(() => {
                 if (this.main.data_controller.params.driving_mode == DrivingMode.NEUTRAL) {
-                    this.main.setDrivingMode(DrivingMode.REVERSE)
+                    this.main.traction_system_controller.setDrivingDirection(DrivingMode.REVERSE)
                 } else {
-                    this.main.setDrivingMode(DrivingMode.NEUTRAL)
+                    this.main.traction_system_controller.setDrivingDirection(DrivingMode.NEUTRAL)
                 }
             }, 1000)
         } else if (event == "released" && button == BUTTONS.BUTTON_2) {

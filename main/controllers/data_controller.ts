@@ -17,6 +17,7 @@ import {exec} from "node:child_process";
 import {encode} from "@msgpack/msgpack";
 import {deflateRawSync} from "node:zlib";
 import ValueEstimator from "../libs/value_estimator";
+import {TractionSystemMode} from "./traction_system_controller";
 
 export const INT16_MAX = 2 ** 15 - 1
 export const INT32_MAX = 2 ** 31 - 1
@@ -58,6 +59,7 @@ export default class DataController extends ParamsHandler {
             g_constant: 9.82,
             system_state: MavState.UNINIT as MavState,
             system_mode: 0,
+            ts_mode: TractionSystemMode.NORMAL as TractionSystemMode,
             driving_mode: DrivingMode.NEUTRAL as DrivingMode,
             throttle_raw: 0,
             throttle_input: 0,
@@ -66,6 +68,7 @@ export default class DataController extends ParamsHandler {
             throttle_raw_min: 0,
             throttle_max_val: 1,
             throttle_dz: 0,
+            throttle_max_rev: 0.3,
             brake_raw: 0,
             brake_input: 0,
             brake_output: 0,

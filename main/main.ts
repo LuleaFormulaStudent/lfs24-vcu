@@ -9,11 +9,9 @@ import LogsController from "./controllers/logs_controller.js";
 import package_info from "./package.json"
 import {configDotenv} from "dotenv";
 import HILController from "./controllers/hil_controller.js";
-import {DrivingMode} from "mavlink-lib/typescript/lfs.js";
 import {exec} from "node:child_process";
 import AdmZip from "adm-zip";
 import fs from "fs";
-import {DrivingModeMessage} from "mavlink-lib/typescript/lfs.js"
 import CoolantSystemController from "./controllers/coolant_system_controller";
 
 configDotenv()
@@ -123,28 +121,6 @@ export default class Main {
 
     isInSystemMode(mode: MavModeFlag): boolean {
         return (this.data_controller.params.system_mode & mode) != 0
-    }
-
-    setDrivingMode(mode: DrivingMode) {
-        this.data_controller.params.driving_mode = mode
-        if (this.data_controller.params.driving_mode == DrivingMode.NEUTRAL) {
-            this.digital_outputs_controller.setReverseSwitch(false, false)
-            this.digital_outputs_controller.setForwardSwitch(false)
-        } else if (this.data_controller.params.driving_mode == DrivingMode.FORWARD) {
-            this.digital_outputs_controller.setReverseSwitch(false, false)
-            this.digital_outputs_controller.setForwardSwitch(true)
-        } else if (this.data_controller.params.driving_mode == DrivingMode.REVERSE) {
-            this.digital_outputs_controller.setForwardSwitch(false, false)
-            this.digital_outputs_controller.setReverseSwitch(true)
-        }
-
-        const msg = new DrivingModeMessage()
-        msg.drivingMode = this.data_controller.params.driving_mode
-        this.mavlink_controller.send(msg).catch(async () => {
-            await this.logs_controller.error("Failed to send driving mode message!")
-        }).then(async () => {
-            await this.logs_controller.info("Setting vehicle in " + DrivingMode[mode].toLowerCase() + " mode.")
-        })
     }
 
     async handleNewFirmware(file_name: string) {

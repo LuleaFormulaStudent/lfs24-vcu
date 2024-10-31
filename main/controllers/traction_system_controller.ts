@@ -4,6 +4,13 @@ import {MavModeFlag, MavState} from "mavlink-mappings/dist/lib/minimal.js";
 import {common, sleep, waitFor} from "node-mavlink";
 import {MavResult} from "mavlink-mappings/dist/lib/common.js";
 import {DrivingMode} from "mavlink-lib/typescript/lfs.js";
+import {DrivingModeMessage} from "mavlink-lib/typescript/lfs";
+
+export enum TractionSystemMode {
+    NORMAL = 0,
+    SERVICE = 1,
+    TRACK = 2,
+}
 
 export default class TractionSystemController {
 
@@ -25,7 +32,11 @@ export default class TractionSystemController {
     async init() {
         this.main.data_controller.addParamListener("throttle_input", ({value}) => {
             if (!this.main.isInSystemMode(MavModeFlag.TEST_ENABLED)) {
-                this.main.data_controller.params.throttle_output = value * this.main.data_controller.params.throttle_max_val
+                if (this.main.data_controller.params.driving_mode == DrivingMode.REVERSE) {
+                    this.main.data_controller.params.throttle_output = value * this.main.data_controller.params.throttle_max_rev
+                } else {
+                    this.main.data_controller.params.throttle_output = value * this.main.data_controller.params.throttle_max_val
+                }
             }
         })
 
@@ -42,7 +53,7 @@ export default class TractionSystemController {
         })
 
         this.main.data_controller.addParamListener("brake_input", ({value}) => {
-            this.main.data_controller.params.brake_output = value*this.main.data_controller.params.brake_max_val
+            this.main.data_controller.params.brake_output = value * this.main.data_controller.params.brake_max_val
         })
 
         this.main.data_controller.addParamListener("brake_output", ({value}) => {
@@ -50,6 +61,40 @@ export default class TractionSystemController {
         })
 
         await this.main.logs_controller.debug("Traction System controller initialized!")
+    }
+
+    setTSMode(mode: TractionSystemMode) {
+        this.main.data_controller.params.ts_mode = mode
+        this.main.mavlink_controller.heartbeat!.customMode = mode as number
+        this.main.logs_controller.info("Setting vehicle in " + DrivingMode[mode].toLowerCase() + " mode.")
+    }
+
+    isInTSMode(mode: TractionSystemMode): boolean {
+        return this.main.data_controller.params.ts_mode == mode
+    }
+
+    setDrivingDirection(mode: DrivingMode) {
+        this.main.data_controller.params.driving_mode = mode
+        if (this.main.data_controller.params.driving_mode == DrivingMode.NEUTRAL) {
+            this.main.digital_outputs_controller.setReverseSwitch(false, false)
+            this.main.digital_outputs_controller.setForwardSwitch(false)
+        } else if (this.main.data_controller.params.driving_mode == DrivingMode.FORWARD) {
+            this.main.digital_outputs_controller.setReverseSwitch(false, false)
+            this.main.digital_outputs_controller.setForwardSwitch(true)
+        } else if (this.main.data_controller.params.driving_mode == DrivingMode.REVERSE) {
+            this.main.digital_outputs_controller.setForwardSwitch(false, false)
+            this.main.digital_outputs_controller.setReverseSwitch(true)
+        }
+
+        const msg = new DrivingModeMessage()
+        msg.drivingMode = this.main.data_controller.params.driving_mode
+        this.main.mavlink_controller.send(msg)
+            .catch(async () => {
+                await this.main.logs_controller.error("Failed to send driving mode message!")
+            })
+            .then(async () => {
+                await this.main.logs_controller.info("Setting vehicle in " + DrivingMode[mode].toLowerCase() + " mode.")
+            })
     }
 
     async activateTS(): Promise<boolean> {
@@ -94,7 +139,7 @@ export default class TractionSystemController {
         try {
             await this.main.logs_controller.info("Trying to deactivate TS")
             this.main.data_controller.params.throttle_output = 0
-            this.main.setDrivingMode(DrivingMode.NEUTRAL)
+            this.setDrivingDirection(DrivingMode.NEUTRAL)
             await sleep(500)
             this.main.digital_outputs_controller.setTSActiveRelay(false)
 
@@ -118,10 +163,12 @@ export default class TractionSystemController {
 
     async onUnexpectedTSShutdown() {
         await this.main.logs_controller.error("Traction system unexpectedly turned off, probably an error occurred!")
-        await this.deactivateTS()
+        if (!this.isInTSMode(TractionSystemMode.SERVICE)) {
+            await this.deactivateTS()
+        }
     }
 
-    async doMotorTest(throttle:number, direction: DrivingMode, time: number) {
+    async doMotorTest(throttle: number, direction: DrivingMode, time: number) {
         await this.main.mavlink_controller.sendCmdAck(common.MavCmd.DO_MOTOR_TEST, MavResult.IN_PROGRESS, 0)
         this.main.setSystemMode(MavModeFlag.TEST_ENABLED, true)
         await this.main.logs_controller.info("Initiating motor test..")
@@ -131,12 +178,12 @@ export default class TractionSystemController {
             await this.main.mavlink_controller.sendCmdAck(common.MavCmd.DO_MOTOR_TEST, MavResult.FAILED, 100)
         }
 
-        await this.main.logs_controller.info("Testing motor in " + DrivingMode[direction].toLowerCase() + " direction with throttle at " + throttle*100 + "% for " + time/1000 + " s.")
+        await this.main.logs_controller.info("Testing motor in " + DrivingMode[direction].toLowerCase() + " direction with throttle at " + throttle * 100 + "% for " + time / 1000 + " s.")
 
         if (await this.activateTS()) {
             await this.main.logs_controller.info("Starting test!")
             await sleep(500)
-            await this.main.setDrivingMode(direction)
+            await this.setDrivingDirection(direction)
             this.main.data_controller.params.throttle_output = throttle
             this.performing_motor_test = true
 
@@ -157,21 +204,6 @@ export default class TractionSystemController {
             await this.main.mavlink_controller.sendCmdAck(common.MavCmd.DO_MOTOR_TEST, MavResult.FAILED, 100)
             this.main.setSystemMode(MavModeFlag.TEST_ENABLED, false)
         }
-
-        /*if (this.main.in_production) {
-
-        } else {
-            await this.main.logs_controller.info("Skipping activating TS because of not in production.")
-            this.main.data_controller.params.throttle_output = throttle
-            this.performing_motor_test = true
-            this.motor_test_timeout = setTimeout(async () => {
-                this.main.setSystemMode(MavModeFlag.TEST_ENABLED, false)
-                await this.main.logs_controller.info("Motor test done!")
-                this.main.data_controller.params.throttle_output = 0
-                await this.main.mavlink_controller.sendCmdAck(common.MavCmd.DO_MOTOR_TEST, MavResult.ACCEPTED, 100)
-                this.performing_motor_test = false
-            }, time)
-        }*/
     }
 
     async abortMotorTest() {

@@ -14,7 +14,7 @@ export default class RelayBoard {
     private output_8: Gpio
 
     constructor() {
-        this.output_1 = new Gpio(535, 'out');
+        this.output_1 = new Gpio(535, 'out'); // Track drive profile
         this.output_2 = new Gpio(536, 'out');// TS ACTIVATE
         //this.output_3 = new Gpio(519, 'out'); // Does not Work!!
         this.output_4 = new Gpio(528, 'out'); // Reverse Direction
