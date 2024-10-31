@@ -18,18 +18,18 @@ export default class CanSocket extends Duplex {
         this.channel = <RawChannel>createRawChannel(channel)
         this.channel.addListener("onMessage", (msg: Message) => {
             if (msg.data[0] == 0xFD) {
-                const tot_mavlink_length = msg.data[1] + 12
                 this.buffer[msg.id] = {
-                    fin_length: tot_mavlink_length,
-                    data: Buffer.alloc(tot_mavlink_length),
+                    fin_length: msg.data[1] + 12,
+                    data: Buffer.alloc(msg.data[1] + 12),
                     offset: 0,
                 }
             }
+
             this.buffer[msg.id].data.fill(msg.data, this.buffer[msg.id].offset)
             this.buffer[msg.id].offset += msg.data.byteLength
 
-            if (this.buffer[msg.id].offset == this.buffer[msg.id].fin_length - 1) {
-                if (!this.push(this.buffer[msg.id], "binary")) {
+            if (this.buffer[msg.id].offset == this.buffer[msg.id].fin_length) {
+                if (!this.push(this.buffer[msg.id].data, "binary")) {
                     this.msg_buffer.push(this.buffer[msg.id])
                 }
             }
