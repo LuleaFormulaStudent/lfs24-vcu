@@ -2,10 +2,16 @@ import {Duplex} from "node:stream";
 import {createRawChannel} from "socketcan"
 import {Message, RawChannel} from "*can.node";
 
+interface mavlink_msg {
+    fin_length: number,
+    data: Buffer,
+    offset: number
+}
+
 export default class CanSocket extends Duplex {
     private channel: RawChannel
-    private msg_buffer = []
-    private buffer: {[propName: number]: {fin_length: number, data: Buffer, offset: number}} = {}
+    private msg_buffer: mavlink_msg[] = []
+    private buffer: { [propName: number]: mavlink_msg } = {}
 
     constructor(options = {}, channel: string = "can0") {
         super(options);
@@ -22,8 +28,8 @@ export default class CanSocket extends Duplex {
             this.buffer[msg.id].data.fill(msg.data, this.buffer[msg.id].offset)
             this.buffer[msg.id].offset += msg.data.byteLength
 
-            if(this.buffer[msg.id].offset == this.buffer[msg.id].fin_length - 1) {
-                if(!this.push(this.buffer[msg.id], "binary")) {
+            if (this.buffer[msg.id].offset == this.buffer[msg.id].fin_length - 1) {
+                if (!this.push(this.buffer[msg.id], "binary")) {
                     this.msg_buffer.push(this.buffer[msg.id])
                 }
             }
