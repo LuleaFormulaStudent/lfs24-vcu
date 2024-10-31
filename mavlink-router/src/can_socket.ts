@@ -4,14 +4,28 @@ import {Message, RawChannel} from "*can.node";
 
 export default class CanSocket extends Duplex {
     private channel: RawChannel
-    private buffer: number[] = []
+    private msg_buffer = []
+    private buffer: {[propName: number]: {fin_length: number, data: Buffer, offset: number}} = {}
 
     constructor(options = {}, channel: string = "can0") {
         super(options);
         this.channel = <RawChannel>createRawChannel(channel)
         this.channel.addListener("onMessage", (msg: Message) => {
-            if(!this.push(msg.data, "binary")) {
-                this.buffer.push(...Array.from(msg.data))
+            if (msg.data[0] == 0xFD) {
+                const tot_mavlink_length = msg.data[1] + 12
+                this.buffer[msg.id] = {
+                    fin_length: tot_mavlink_length,
+                    data: Buffer.alloc(tot_mavlink_length),
+                    offset: 0,
+                }
+            }
+            this.buffer[msg.id].data.fill(msg.data, this.buffer[msg.id].offset)
+            this.buffer[msg.id].offset += msg.data.byteLength
+
+            if(this.buffer[msg.id].offset == this.buffer[msg.id].fin_length - 1) {
+                if(!this.push(this.buffer[msg.id], "binary")) {
+                    this.msg_buffer.push(this.buffer[msg.id])
+                }
             }
         });
         this.channel.start()
@@ -27,12 +41,8 @@ export default class CanSocket extends Duplex {
     }
 
     _read(size: number) {
-        if (size <= this.buffer.length) {
-            this.push(Buffer.from(this.buffer.slice(0, size)), "binary");
-            this.buffer.splice(0, size);
-        } else {
-            this.push(Buffer.from(this.buffer.slice(0, this.buffer.length)), "binary");
-            this.buffer.splice(0, this.buffer.length);
+        for (let i = 0; i < this.msg_buffer.length; i++) {
+            this.push(this.msg_buffer[i].data, "binary");
         }
     }
 
