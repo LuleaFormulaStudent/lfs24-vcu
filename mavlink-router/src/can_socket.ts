@@ -25,7 +25,7 @@ export default class CanSocket extends Duplex {
                         offset: 0,
                     }
                 }
-                this.buffer[msg.id].data.write(msg.data.toString(), this.buffer[msg.id].offset)
+                this.buffer[msg.id].data.fill(msg.data, this.buffer[msg.id].offset)
                 this.buffer[msg.id].offset += msg.data.byteLength
                 if (this.buffer[msg.id].offset == this.buffer[msg.id].fin_length && !this.push(this.buffer[msg.id].data, "binary")) {
                     this.msg_buffer.push(this.buffer[msg.id])
