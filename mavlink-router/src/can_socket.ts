@@ -33,6 +33,7 @@ export default class CanSocket extends Duplex {
             } catch (e) {
                 console.error(e)
                 console.log(this.buffer[msg.id])
+                console.log(msg)
             }
         });
         this.channel.start()
