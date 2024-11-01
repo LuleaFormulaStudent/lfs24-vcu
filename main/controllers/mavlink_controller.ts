@@ -265,7 +265,7 @@ export default class MavlinkController {
         } else if (data instanceof common.CommandLong && <number>data.command == 50000) {
             await this.main.coolant_system_controller.handleCoolantPumpCmd(data)
         } else if (data instanceof common.CommandLong && data.command == common.MavCmd.DO_SET_MODE) {
-            this.main.traction_system_controller.setTSMode((data as common.DoSetModeCommand).customMode)
+            this.main.traction_system_controller.setTSMode(data._param2)
         } else if (data instanceof common.LoggingData) {
             await this.main.data_controller.sendLoggingDataList(sys_id, comp_id)
         } else if (data instanceof common.ButtonChange) {
