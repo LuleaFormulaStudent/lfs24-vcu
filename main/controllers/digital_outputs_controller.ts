@@ -15,7 +15,7 @@ export default class DigitalOutputsController {
     }
 
     async init() {
-        this.setCoolantPumpOutput(this.main.data_controller.params.cool_pump_start)
+        this.main.coolant_system_controller.setCoolantPump(this.main.data_controller.params.cool_pump_start, false)
         await this.main.logs_controller.debug("Digital outputs controller initialized!")
         this.setReverseSwitch(false)
     }
@@ -60,13 +60,12 @@ export default class DigitalOutputsController {
         }
     }
 
-    setCoolantPumpOutput(val: boolean) {
+    setCoolantPumpSwitch(val: boolean) {
         if (val != this.main.data_controller.params.cool_pump_output) {
             this.main.data_controller.params.cool_pump_output = val
             if (this.board) {
                 this.board.setOutput(8, val)
             }
-            this.sendDOMessage()
         }
     }
 

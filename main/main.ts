@@ -52,7 +52,6 @@ export default class Main {
 
         if (this.in_production) {
             const onExit = async (err: any) => {
-                this.digital_outputs_controller.setCoolantPumpOutput(false)
                 this.digital_outputs_controller.setForwardSwitch(false)
                 this.digital_outputs_controller.setReverseSwitch(false)
 

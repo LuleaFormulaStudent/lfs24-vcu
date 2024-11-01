@@ -234,10 +234,10 @@ export default class DataController extends ParamsHandler {
             },
             gps_num_sats: {
                 min: 0,
-                max: 20
+                max: 100
             },
             gps_altitude: {
-                min: -200,
+                min: -2000,
                 max: 2000
             },
             gps_hdop: {

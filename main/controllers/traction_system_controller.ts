@@ -68,6 +68,9 @@ export default class TractionSystemController {
         this.main.mavlink_controller.heartbeat!.customMode = mode as number
         this.main.digital_outputs_controller.setTrackModeSwitch(mode == TractionSystemMode.TRACK)
         this.main.logs_controller.info("Setting vehicle in " + TractionSystemMode[mode].toLowerCase() + " mode.")
+        if (mode == TractionSystemMode.TRACK) {
+            this.main.coolant_system_controller.setCoolantPump(true)
+        }
     }
 
     isInTSMode(mode: TractionSystemMode): boolean {
