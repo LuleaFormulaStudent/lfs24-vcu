@@ -30,6 +30,12 @@ export default class DigitalOutputsController {
         }
     }
 
+    setTrackModeSwitch(val: boolean) {
+        if (this.board) {
+            this.board.setOutput(1, val)
+        }
+    }
+
     setForwardSwitch(val: boolean, should_send: boolean = true) {
         if (val != this.main.data_controller.params.forward_output) {
             this.main.data_controller.params.forward_output = val

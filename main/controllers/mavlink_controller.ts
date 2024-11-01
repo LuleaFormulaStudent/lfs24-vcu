@@ -245,8 +245,8 @@ export default class MavlinkController {
             if (data.id == 1) {
                 this.main.data_controller.params.hv_cur_amp = data.currentBattery / 10
                 this.main.data_controller.params.hv_cur_temp = data.temperature / 100
-                this.main.data_controller.params.hv_cons_cap += data.currentConsumed / 1000
-                this.main.data_controller.params.hv_cons_energy += data.currentConsumed * this.main.data_controller.params.hv_cur_voltage / 1000
+                this.main.data_controller.params.hv_cons_cap += Number.isNaN(data.currentConsumed) ? 0 : (data.currentConsumed / 1000)
+                this.main.data_controller.params.hv_cons_energy += Number.isNaN(data.currentConsumed) ? 0 : (data.currentConsumed * this.main.data_controller.params.hv_cur_voltage / 1000)
             }
         } else if (data instanceof common.RadioStatus) {
             this.main.data_controller.params.radio_rssi = data.rssi

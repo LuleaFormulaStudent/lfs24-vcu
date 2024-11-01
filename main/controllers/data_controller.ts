@@ -523,6 +523,7 @@ export default class DataController extends ParamsHandler {
 
         this.addParamListener(["hv_cons_cap", "hv_max_cap"], () => {
             this.params.hv_bdi = Math.max(0, (this.params.hv_max_cap - this.params.hv_cons_cap) / this.params.hv_max_cap)
+            this.saveParam("hv_bdi", this.params.hv_bdi)
         })
 
         this.addParamListener("hv_cur_amp", ({value}) => {
