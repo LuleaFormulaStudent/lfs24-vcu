@@ -11,8 +11,11 @@ iface can0 inet manual
 ## ToDO
 
 - [ ] Lägga in styrsensorn
-- [ ] Implementera mavlink med de andra systemen
+- [x] Implementera mavlink med de andra systemen
 - [ ] Addera hastighets beräkning för IMU
 - [x] Lägga till estimering av effektförbrukning från både LV och HV
-- [ ] Lägga till estimering av HV spänning tills det mäts
+- [x] Lägga till estimering av HV spänning tills det mäts
+- [x] Lägg till stöd för track drive profile
+- [x] Sänka throttle output om bilen är i back
+- [ ] Implementera one pedal mode
 
