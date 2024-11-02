@@ -130,10 +130,15 @@ export default class TractionSystemController {
             return true
         } catch (e) {
             if (e == "Timeout") {
-                this.main.digital_outputs_controller.setTSActiveRelay(false)
-                await this.main.logs_controller.error("Traction system did not activate in time!")
+                if (this.isInTSMode(TractionSystemMode.SERVICE)) {
+                    await this.main.logs_controller.error("Traction system did not activate in time, skipping as in service mode..")
+                } else {
+                    this.main.digital_outputs_controller.setTSActiveRelay(false)
+                    await this.main.logs_controller.error("Traction system did not activate in time!")
+                }
             } else {
-                await this.main.logs_controller.error("Error occurred ")
+                await this.main.logs_controller.error("Unknown error occurred when trying to activate TS system!")
+                console.error(e)
             }
             return false
         }
