@@ -144,7 +144,7 @@ export default class TractionSystemController {
             await this.main.logs_controller.info("Trying to deactivate TS")
             this.main.data_controller.params.throttle_output = 0
             this.setDrivingDirection(DrivingMode.NEUTRAL)
-            await sleep(500)
+            await sleep(1000)
             this.main.digital_outputs_controller.setTSActiveRelay(false)
 
             if (this.main.in_production) {
@@ -152,6 +152,10 @@ export default class TractionSystemController {
             } else {
                 await sleep(1000)
                 await this.main.setSystemState(MavState.STANDBY)
+            }
+
+            if (this.isInTSMode(TractionSystemMode.SERVICE)) {
+                this.isInTSMode(TractionSystemMode.NORMAL)
             }
 
             return true
@@ -166,8 +170,10 @@ export default class TractionSystemController {
     }
 
     async onUnexpectedTSShutdown() {
-        await this.main.logs_controller.error("Traction system unexpectedly turned off, probably an error occurred!")
-        if (!this.isInTSMode(TractionSystemMode.SERVICE)) {
+        if (this.isInTSMode(TractionSystemMode.SERVICE)) {
+            await this.main.logs_controller.error("Traction system unexpectedly turned off, ignoring because in service mode..")
+        } else {
+            await this.main.logs_controller.error("Traction system unexpectedly turned off, probably an error occurred!")
             await this.deactivateTS()
         }
     }
@@ -188,6 +194,7 @@ export default class TractionSystemController {
             await this.main.logs_controller.info("Starting test!")
             await sleep(500)
             await this.setDrivingDirection(direction)
+            await sleep(1000)
             this.main.data_controller.params.throttle_output = throttle
             this.performing_motor_test = true
 
