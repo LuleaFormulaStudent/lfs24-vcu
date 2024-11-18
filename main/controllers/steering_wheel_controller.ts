@@ -51,7 +51,7 @@ export default class SteeringWheelController {
             this.driving_mode_forward_timeout = setTimeout(() => {
                 if (this.main.data_controller.params.driving_mode == DrivingMode.NEUTRAL) {
                     this.main.traction_system_controller.setDrivingDirection(DrivingMode.FORWARD)
-                } else {
+                } else if (this.main.data_controller.params.driving_mode == DrivingMode.REVERSE) {
                     this.main.traction_system_controller.setDrivingDirection(DrivingMode.NEUTRAL)
                 }
             }, 1000)
@@ -62,7 +62,7 @@ export default class SteeringWheelController {
             this.driving_mode_reverse_timeout = setTimeout(() => {
                 if (this.main.data_controller.params.driving_mode == DrivingMode.NEUTRAL) {
                     this.main.traction_system_controller.setDrivingDirection(DrivingMode.REVERSE)
-                } else {
+                } else if (this.main.data_controller.params.driving_mode == DrivingMode.FORWARD) {
                     this.main.traction_system_controller.setDrivingDirection(DrivingMode.NEUTRAL)
                 }
             }, 1000)
