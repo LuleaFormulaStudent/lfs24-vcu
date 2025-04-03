@@ -14,14 +14,14 @@ export default class RelayBoard {
     private output_8: Gpio
 
     constructor() {
-        this.output_1 = new Gpio(535, 'out'); // Track drive profile
-        this.output_2 = new Gpio(536, 'out');// TS ACTIVATE
-        //this.output_3 = new Gpio(519, 'out'); // Does not Work!!
-        this.output_4 = new Gpio(528, 'out'); // Reverse Direction
-        this.output_5 = new Gpio(532, 'out'); // Foot Switch
-        this.output_6 = new Gpio(529, 'out'); // Forward direction
-        this.output_7 = new Gpio(539, 'out'); // Brake Light
-        this.output_8 = new Gpio(534, 'out'); // BCM = 22
+        this.output_1 = new Gpio(535, 'out'); // Track drive profile    BCM 23
+        this.output_2 = new Gpio(536, 'out');// TS ACTIVATE             BCM 24
+        //this.output_3 = new Gpio(519, 'out'); // Does not Work!!      BCM: --
+        this.output_4 = new Gpio(528, 'out'); // Reverse Direction      BCM 16
+        this.output_5 = new Gpio(532, 'out'); // Foot Switch            BCM 20
+        this.output_6 = new Gpio(529, 'out'); // Forward direction      BCM 17
+        this.output_7 = new Gpio(539, 'out'); // Brake Light            BCM 27
+        this.output_8 = new Gpio(534, 'out'); // Coolant Pump           BCM 22
 
         for (let i: RelayOutputPort = 1; i <= 8; i++) {
             this.setOutput(<RelayOutputPort>i, false)
