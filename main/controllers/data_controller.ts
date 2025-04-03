@@ -546,9 +546,15 @@ export default class DataController extends ParamsHandler {
         this.addParamListener("lv_cur_amp", () => {
             const current_time = this.main.uptime
             if (this.last_ina_current_update > 0) {
-                this.params.lv_cons_cap += (current_time - this.last_ina_current_update) * (this.previous_ina_current + this.params.lv_cur_amp) / (1000 * 2)
-                this.previous_ina_current = this.params.lv_cur_amp
-                this.saveParam("lv_cons_cap", this.params.lv_cons_cap)
+                const energy_change = (current_time - this.last_ina_current_update) * (this.previous_ina_current + this.params.lv_cur_amp) / (1000 * 2)
+                if (energy_change < 0.1*this.params.lv_max_energy / 13.2) {
+                    this.params.lv_cons_cap += energy_change
+                    this.previous_ina_current = this.params.lv_cur_amp
+                    this.saveParam("lv_cons_cap", this.params.lv_cons_cap)
+                } else {
+                    this.main.logs_controller.debug("Got to high consume for cap, (dE: " + energy_change + " amp: " + this.params.lv_cur_amp + " dt: " + (current_time - this.last_ina_current_update))
+                }
+
             }
             this.last_ina_current_update = current_time
         })
@@ -556,9 +562,14 @@ export default class DataController extends ParamsHandler {
         this.addParamListener("lv_cur_power", () => {
             const current_time = this.main.uptime
             if (this.last_ina_power_update > 0) {
-                this.params.lv_cons_energy += (current_time - this.last_ina_power_update) * (this.previous_ina_power + this.params.lv_cur_power) / (1000 * 2 * 3600)
-                this.previous_ina_power = this.params.lv_cur_power
-                this.saveParam("lv_cons_energy", this.params.lv_cons_energy)
+                const energy_change = (current_time - this.last_ina_power_update) * (this.previous_ina_power + this.params.lv_cur_power) / (1000 * 2 * 3600)
+                if (energy_change < 0.1*this.params.lv_cur_power) {
+                    this.params.lv_cons_energy += energy_change
+                    this.previous_ina_power = this.params.lv_cur_power
+                    this.saveParam("lv_cons_energy", this.params.lv_cons_energy)
+                } else {
+                    this.main.logs_controller.debug("Got to high consume for power, (dE: " + energy_change + " Watt: " + this.params.lv_cur_power + " dt: " + (current_time - this.last_ina_current_update))
+                }
             }
             this.last_ina_power_update = current_time
         })
