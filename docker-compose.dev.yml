@@ -7,8 +7,8 @@ services:
         ports:
             - "8086:8086"
         volumes:
-            - ./data-prod-3/influxdb-data:/var/lib/influxdb2
-            - ./data-prod-3/influxdb-config:/etc/influxdb2
+            - ./data-prod-4/influxdb-data:/var/lib/influxdb2
+            - ./data-prod-4/influxdb-config:/etc/influxdb2
 
     lfs_vcu_main:
         container_name: lfs-vcu-main
