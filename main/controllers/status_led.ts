@@ -9,9 +9,9 @@ export default class StatusLed {
 
     constructor(private main: Main) {
         if (this.main.in_production) {
-            this.red_led = new Gpio(518, 'out');
-            this.green_led = new Gpio(533, 'out');
-            this.blue_led = new Gpio(538, 'out');
+            this.red_led = new Gpio(518, 'out');    // BCM: 6
+            this.green_led = new Gpio(533, 'out');  // BCM: 21
+            this.blue_led = new Gpio(538, 'out');  // BCM: 26
         }
     }
 
