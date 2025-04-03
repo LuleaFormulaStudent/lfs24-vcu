@@ -1,11 +1,11 @@
 import {I2CBus, openSync} from "i2c-bus";
-import ROUnaryStruct from "../LSM6DS032/ro_unary_struct.js";
-import RWBit from "../LSM6DS032/rwbit.js";
-import RWBits from "../LSM6DS032/rwbits.js";
-import ROBits from "../LSM6DS032/robits.js";
+import ROUnaryStruct from "../adafruit_i2c_lib/ro_unary_struct.js";
+import RWBit from "../adafruit_i2c_lib/rwbit.js";
+import RWBits from "../adafruit_i2c_lib/rwbits.js";
+import ROBits from "../adafruit_i2c_lib/robits.js";
 import os from "os";
 import EventEmitter from "node:events";
-import ROBit from "../LSM6DS032/robit.js";
+import ROBit from "../adafruit_i2c_lib/robit.js";
 
 export default class INA260 extends EventEmitter {
     private readonly _REG_CONFIG = 0x00  // CONFIGURATION REGISTER (R/W)

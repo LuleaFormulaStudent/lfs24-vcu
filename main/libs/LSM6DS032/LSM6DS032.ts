@@ -1,10 +1,10 @@
 import {I2CBus, openSync} from "i2c-bus"
 import os from "os";
 import EventEmitter from "node:events";
-import UnaryStruct from "./unary_struct.js";
-import RWBit from "./rwbit.js";
-import RWBits from "./rwbits.js";
-import Struct from "./struct.js";
+import UnaryStruct from "../adafruit_i2c_lib/unary_struct.js";
+import RWBit from "../adafruit_i2c_lib/rwbit.js";
+import RWBits from "../adafruit_i2c_lib/rwbits.js";
+import Struct from "../adafruit_i2c_lib/struct.js";
 
 export default class LSM6DS032 extends EventEmitter {
     private i2c_device: I2CBus | null = null
