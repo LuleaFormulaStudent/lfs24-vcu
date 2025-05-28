@@ -28,6 +28,7 @@ export default class SteeringWheelController {
     }
 
     async handleButtonChange(data: common.ButtonChange) {
+        await this.main.logs_controller.debug("Steering wheel button change: " + data.state)
         if (((data.state & BUTTONS.BUTTON_1) != 0) != this.button_1_state) {
             await this.onButtonPress(BUTTONS.BUTTON_1, (data.state & BUTTONS.BUTTON_1) != 0 ? "pressed" : "released")
             this.button_1_state = !this.button_1_state

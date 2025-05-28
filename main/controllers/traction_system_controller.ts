@@ -79,15 +79,19 @@ export default class TractionSystemController {
 
     setDrivingDirection(mode: DrivingMode) {
         this.main.data_controller.params.driving_mode = mode
+
         if (this.main.data_controller.params.driving_mode == DrivingMode.NEUTRAL) {
             this.main.digital_outputs_controller.setReverseSwitch(false, false)
             this.main.digital_outputs_controller.setForwardSwitch(false)
+            this.main.logs_controller.debug("Neutral stack trace : " + new Error().stack.toString())
         } else if (this.main.data_controller.params.driving_mode == DrivingMode.FORWARD) {
             this.main.digital_outputs_controller.setReverseSwitch(false, false)
             this.main.digital_outputs_controller.setForwardSwitch(true)
+            this.main.logs_controller.debug("Forward stack trace : " + new Error().stack.toString())
         } else if (this.main.data_controller.params.driving_mode == DrivingMode.REVERSE) {
             this.main.digital_outputs_controller.setForwardSwitch(false, false)
             this.main.digital_outputs_controller.setReverseSwitch(true)
+            this.main.logs_controller.debug("Reverse stack trace : " + new Error().stack.toString())
         }
 
         const msg = new DrivingModeMessage()
