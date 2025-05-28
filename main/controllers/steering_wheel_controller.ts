@@ -81,5 +81,6 @@ export default class SteeringWheelController {
         } else if (event == "released" && button == BUTTONS.BUTTON_4) {
             clearTimeout(this.activate_ts_timeout)
         }
+        this.main.logs_controller.debug("Button pressed: " + button + " | " + event)
     }
 }
