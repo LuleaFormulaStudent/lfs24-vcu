@@ -52,3 +52,11 @@ cat /sys/kernel/debug/gpio
 - [x] Sänka throttle output om bilen är i back
 - [ ] Implementera one pedal mode
 
+## Consumed and charged
+Consumed: 91.36
+chraged, 19,9938 + 19,807 + 13,049 + 12,951 / 2
+
+32.9
+
+0,36
+
