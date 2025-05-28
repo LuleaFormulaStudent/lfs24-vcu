@@ -136,7 +136,7 @@ export default class MavlinkController {
         this.setMsgInterval(BrakeData.MSG_ID, 200)
         this.setMsgInterval(common.GpsRawInt.MSG_ID, 500)
         this.setMsgInterval(common.RawImu.MSG_ID, 100)
-        this.setMsgInterval(ComputerStatus.MSG_ID, 1000)
+        //this.setMsgInterval(ComputerStatus.MSG_ID, 1000)
     }
 
     async send(msg: MavLinkData | MavLinkData[]): Promise<boolean> {
